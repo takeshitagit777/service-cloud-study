@@ -1,16 +1,14 @@
 const $ = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => [...el.querySelectorAll(s)];
-const STORE_KEY='sc-study-v1', TRANS_KEY='sc-trans-v1';
+const STORE_KEY='sc-study-v1';
+const STUDY_GOAL=80;
 let questions=[], currentView='dashboard', studyPool=[], studyIndex=0, studyFilter='all', studySource='2026-04-28', studyCategory='all';
 let mock=null;
 let state = JSON.parse(localStorage.getItem(STORE_KEY)||'null') || { progress:{}, streak:0, bestStreak:0, sessions:[], theme:'dark' };
-let translations = JSON.parse(localStorage.getItem(TRANS_KEY)||'{}');
 
 function save(){ localStorage.setItem(STORE_KEY,JSON.stringify(state)); }
-function saveTrans(){ localStorage.setItem(TRANS_KEY,JSON.stringify(translations)); }
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(36)}
 function p(uid){return state.progress[uid] || {attempts:0,correct:0,last:null,favorite:false};}
 function metrics(){
   const vals=Object.values(state.progress), attempted=vals.filter(x=>x.attempts>0), attempts=attempted.reduce((a,x)=>a+x.attempts,0), correct=attempted.reduce((a,x)=>a+x.correct,0);
@@ -18,31 +16,6 @@ function metrics(){
 }
 function applyTheme(){document.body.classList.toggle('light',state.theme==='light')}
 
-async function translate(text){
-  if(!text) return '';
-  const k=hash(text); if(translations[k]) return translations[k];
-  try{
-    let r=await fetch('/api/translate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text})});
-    if(!r.ok) throw 0; let j=await r.json(); if(!j.translated) throw 0;
-    translations[k]=j.translated; saveTrans(); return j.translated;
-  }catch(e){
-    try{
-      const u='https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ja&dt=t&q='+encodeURIComponent(text);
-      const r=await fetch(u); const j=await r.json(); const out=(j?.[0]||[]).map(x=>x?.[0]||'').join('');
-      if(out){translations[k]=out;saveTrans();return out}
-    }catch(_){ }
-  }
-  return text;
-}
-async function hydrateTranslation(q, root){
-  const status=$('.translate-state',root); if(status) status.innerHTML='<i class="dot-loader"></i> 日本語訳を読込中';
-  const [qt,...rest]=await Promise.all([translate(q.question),...Object.values(q.options).map(translate),translate(q.explanation)]);
-  const exp=rest.pop(); const opt=rest;
-  const qEl=$('[data-ja-question]',root); if(qEl) qEl.textContent=qt;
-  $$('.option-text',root).forEach((e,i)=>e.textContent=opt[i]||Object.values(q.options)[i]);
-  const ex=$('[data-ja-explanation]',root); if(ex) ex.textContent=exp;
-  if(status) status.textContent='日本語訳';
-}
 
 function setView(view){
   currentView=view; $$('.view').forEach(v=>v.classList.remove('active')); $('#view-'+view).classList.add('active');
@@ -64,7 +37,7 @@ function renderDashboard(){
  </div>
  <div class="card big-action">
    <p class="eyebrow">TODAY'S STUDY</p><h2>過去問を、ひたすら解く。</h2>
-   <p>最新116問と旧版80問を収録。回答履歴から苦手問題を自動で残し、間違えた問題だけ何度でも回せます。</p>
+   <p>最新116問と旧版80問を収録。日本語は事前に精査済みで、Trailhead / Omni-Channel / Einstein Next Best Action などの固有名詞は原文を維持します。外部翻訳APIへの通信はありません。</p>
    <button class="primary-btn" id="dashStart">一問一答を始める →</button>
  </div>
  <div class="grid dashboard-grid" style="margin-top:16px">
@@ -112,16 +85,21 @@ function renderStudyQuestion(){
  </div><aside class="card side-panel"><h3>学習ステータス</h3><div class="side-stat"><span>現在位置</span><b>${studyIndex+1} / ${studyPool.length}</b></div><div class="side-stat"><span>この問題の回答回数</span><b>${prog.attempts}</b></div><div class="side-stat"><span>この問題の正答率</span><b>${prog.attempts?Math.round(prog.correct/prog.attempts*100)+'%':'--'}</b></div><div class="jump-row"><input class="select" id="jumpNo" type="number" min="1" max="${studyPool.length}" value="${studyIndex+1}"><button class="secondary-btn" id="jumpBtn">移動</button></div><div class="keyboard-hint">ショートカット<br>1〜4: 選択肢 / →: 次へ / F: お気に入り</div></aside></div>`;
  wireQuestion($('#studyQuestion'),q,false);
  $('#favBtn').onclick=()=>{const x=p(q.uid);x.favorite=!x.favorite;state.progress[q.uid]=x;save();renderStudyQuestion()};
- $('#showEnglish').onclick=()=>$('.original-text',$('#studyQuestion')).classList.toggle('hidden');
+ $('#showEnglish').onclick=()=>toggleOriginal($('#studyQuestion'),$('#showEnglish'));
  $('#prevQ').onclick=()=>{studyIndex=Math.max(0,studyIndex-1);renderStudyQuestion()}; $('#nextQ').onclick=()=>{studyIndex=(studyIndex+1)%studyPool.length;renderStudyQuestion()};
  $('#jumpBtn').onclick=()=>{studyIndex=Math.max(0,Math.min(studyPool.length-1,(+$('#jumpNo').value||1)-1));renderStudyQuestion()};
- hydrateTranslation(q,$('#studyQuestion'));
+}
+function toggleOriginal(root,button){
+ const on=root.classList.toggle('show-en'); if(button)button.textContent=on?'JP 日本語':'EN 原文';
 }
 function questionHTML(q,prog,isMock){
- return `<div class="question-meta"><span class="badge">${esc(q.category)}</span><span class="badge muted">${esc(q.source)}</span><span class="translate-state">日本語訳</span><span class="question-no">Q${q.id}</span></div>
- <h2 class="question-text" data-ja-question>${esc(q.question)}</h2><div class="original-text hidden">${esc(q.question)}</div>
- <div class="options">${Object.entries(q.options).map(([l,t])=>`<button class="option" data-answer="${l}"><span class="option-letter">${l}</span><span class="option-text">${esc(t)}</span></button>`).join('')}</div>
- <div class="answer-box"><div class="answer-title"></div><p data-ja-explanation>${esc(q.explanation)}</p><div class="original-text hidden" style="margin-top:10px">${esc(q.explanation)}</div></div>`;
+ const ja=q.ja||{question:q.question,options:q.options,explanation:q.explanation};
+ const note=q.sourceNote?`<div class="source-note"><strong>原文注意</strong>${esc(q.sourceNote)}</div>`:'';
+ const opts=Object.keys(q.options).map(l=>`<button class="option" data-answer="${l}"><span class="option-letter">${l}</span><span class="option-copy"><span class="option-text">${esc(ja.options[l]||q.options[l])}</span><span class="option-original">${esc(q.options[l])}</span></span></button>`).join('');
+ return `<div class="question-meta"><span class="badge">${esc(q.category)}</span><span class="badge muted">${esc(q.source)}</span><span class="term-policy">固有名詞は原文維持</span><span class="question-no">Q${q.id}</span></div>
+ ${note}<h2 class="question-text">${esc(ja.question)}</h2><div class="original-text"><span class="original-label">PDF原文</span>${esc(q.question)}</div>
+ <div class="options">${opts}</div>
+ <div class="answer-box"><div class="answer-title"></div><p>${esc(ja.explanation)}</p><div class="answer-source">※ 正解・解説は添付問題集の記載を基準にしています。Salesforce の仕様変更や元資料の誤植により、現行仕様と異なる可能性があります。</div><div class="original-text answer-original" style="margin-top:10px"><span class="original-label">PDF原文の解説</span>${esc(q.explanation)}</div></div>`;
 }
 function wireQuestion(root,q,isMock){
  $$('.option',root).forEach(btn=>btn.onclick=()=>{
@@ -130,7 +108,7 @@ function wireQuestion(root,q,isMock){
    const x=p(q.uid);x.attempts++;x.correct+=ok?1:0;x.last=ok?'correct':'wrong';x.lastAt=Date.now();state.progress[q.uid]=x;
    if(ok){state.streak=(state.streak||0)+1;state.bestStreak=Math.max(state.bestStreak||0,state.streak)}else state.streak=0;save();
    $$('.option',root).forEach(o=>{o.disabled=true;if(o.dataset.answer===q.answer)o.classList.add('correct');if(o.dataset.answer===selected&&!ok)o.classList.add('wrong')});
-   const box=$('.answer-box',root);box.classList.add('show');$('.answer-title',box).innerHTML=ok?'<span class="green">✓ 正解</span>':'<span class="red">✕ 不正解</span> <span>正解: '+q.answer+'</span>';updateGlobal();
+   const box=$('.answer-box',root);box.classList.add('show');$('.answer-title',box).innerHTML=ok?'<span class="green">✓ 正解</span>':'<span class="red">✕ 不正解</span> <span>問題集記載の正解: '+q.answer+'</span>';updateGlobal();
  });
 }
 function saveMockSelection(root,l){$$('.option',root).forEach(o=>o.classList.toggle('selected',o.dataset.answer===l));renderMockFooter()}
@@ -153,8 +131,8 @@ function startMock(count,source,useTimer){
 function formatTime(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
 function renderMockQuestion(){
  const q=mock.questions[mock.index]; const selected=mock.answers[q.uid];
- $('#view-mock').innerHTML=`<div class="question-layout"><div class="card question-card" id="mockQuestion">${questionHTML(q,p(q.uid),true)}</div><aside class="card side-panel"><h3>模擬試験</h3><div class="side-stat"><span>進捗</span><b>${mock.index+1} / ${mock.questions.length}</b></div><div class="side-stat"><span>回答済み</span><b>${Object.keys(mock.answers).length}</b></div>${mock.duration?`<div class="side-stat"><span>残り時間</span><b class="timer" id="mockTimerDisplay">${formatTime(Math.max(0,mock.duration-Math.floor((Date.now()-mock.started)/1000)))}</b></div>`:''}</aside></div><div id="mockFooter"></div>`;
- const root=$('#mockQuestion');wireQuestion(root,q,true); if(selected)saveMockSelection(root,selected);hydrateTranslation(q,root);renderMockFooter();
+ $('#view-mock').innerHTML=`<div class="question-layout"><div class="card question-card" id="mockQuestion">${questionHTML(q,p(q.uid),true)}</div><aside class="card side-panel"><h3>模擬試験</h3><div class="side-stat"><span>進捗</span><b>${mock.index+1} / ${mock.questions.length}</b></div><div class="side-stat"><span>回答済み</span><b>${Object.keys(mock.answers).length}</b></div>${mock.duration?`<div class="side-stat"><span>残り時間</span><b class="timer" id="mockTimerDisplay">${formatTime(Math.max(0,mock.duration-Math.floor((Date.now()-mock.started)/1000)))}</b></div>`:''}<button class="tiny-btn source-toggle" id="mockEnglish">EN 原文</button></aside></div><div id="mockFooter"></div>`;
+ const root=$('#mockQuestion');wireQuestion(root,q,true); if(selected)saveMockSelection(root,selected); $('#mockEnglish').onclick=()=>toggleOriginal(root,$('#mockEnglish'));renderMockFooter();
 }
 function renderMockFooter(){
  const h=$('#mockFooter');if(!h||!mock)return;h.innerHTML=`<div class="card mock-footer"><div class="mock-dots">${mock.questions.map((q,i)=>`<i class="mock-dot ${mock.answers[q.uid]?'done':''} ${i===mock.index?'current':''}"></i>`).join('')}</div><div><button class="secondary-btn" id="mockPrev" ${mock.index===0?'disabled':''}>←</button> ${mock.index===mock.questions.length-1?'<button class="primary-btn" id="finishMock">採点する</button>':'<button class="primary-btn" id="mockNext">次へ →</button>'}</div></div>`;
@@ -166,8 +144,8 @@ function finishMock(){
  const score=Math.round(correct/mock.questions.length*100);state.sessions.push({at:Date.now(),label:`模擬 ${mock.questions.length}問`,score,correct,total:mock.questions.length});state.sessions=state.sessions.slice(-30);state.streak=0;save();mock.result={score,correct};mock.active=false;mock.finished=true;renderMockResult();updateGlobal();
 }
 function renderMockResult(){
- const r=mock.result, pass=r.score>=67, cat={};mock.questions.forEach(q=>{cat[q.category]||={n:0,c:0};cat[q.category].n++;if(mock.answers[q.uid]===q.answer)cat[q.category].c++});
- $('#view-mock').innerHTML=`<div class="card result-hero"><p class="eyebrow">RESULT</p><div class="score-big ${pass?'green':'red'}">${r.score}<span> / 100</span></div><div class="result-status">${pass?'目標67%をクリア':'67%まであと '+Math.max(0,67-r.score)+'pt'}</div><p style="color:var(--muted);font-size:11px">※67%はこの学習アプリ内の目標値です。</p><div class="result-grid"><div class="result-mini"><b>${r.correct}</b><span>正解</span></div><div class="result-mini"><b>${mock.questions.length-r.correct}</b><span>不正解</span></div><div class="result-mini"><b>${Object.keys(mock.answers).length}</b><span>回答数</span></div></div><button class="primary-btn" id="retryMock">もう一度</button> <button class="secondary-btn" id="goReview">間違いを復習</button></div><div class="card section-card" style="margin-top:16px"><div class="section-head"><h2>分野別スコア</h2></div><div class="category-list">${Object.entries(cat).map(([n,x])=>{const a=Math.round(x.c/x.n*100);return `<div class="cat-row"><span class="name">${esc(n)}</span><div class="bar"><i style="width:${a}%"></i></div><b>${a}%</b></div>`}).join('')}</div></div>`;
+ const r=mock.result, pass=r.score>=STUDY_GOAL, cat={};mock.questions.forEach(q=>{cat[q.category]||={n:0,c:0};cat[q.category].n++;if(mock.answers[q.uid]===q.answer)cat[q.category].c++});
+ $('#view-mock').innerHTML=`<div class="card result-hero"><p class="eyebrow">RESULT</p><div class="score-big ${pass?'green':'red'}">${r.score}<span> / 100</span></div><div class="result-status">${pass?`学習目標 ${STUDY_GOAL}% をクリア`:`${STUDY_GOAL}%まであと ${Math.max(0,STUDY_GOAL-r.score)}pt`}</div><p style="color:var(--muted);font-size:11px">※ ${STUDY_GOAL}%はこのアプリ内の学習目標で、Salesforce 公式の合格ラインを示すものではありません。</p><div class="result-grid"><div class="result-mini"><b>${r.correct}</b><span>正解</span></div><div class="result-mini"><b>${mock.questions.length-r.correct}</b><span>不正解</span></div><div class="result-mini"><b>${Object.keys(mock.answers).length}</b><span>回答数</span></div></div><button class="primary-btn" id="retryMock">もう一度</button> <button class="secondary-btn" id="goReview">間違いを復習</button></div><div class="card section-card" style="margin-top:16px"><div class="section-head"><h2>分野別スコア</h2></div><div class="category-list">${Object.entries(cat).map(([n,x])=>{const a=Math.round(x.c/x.n*100);return `<div class="cat-row"><span class="name">${esc(n)}</span><div class="bar"><i style="width:${a}%"></i></div><b>${a}%</b></div>`}).join('')}</div></div>`;
  $('#retryMock').onclick=()=>{mock=null;renderMock()};$('#goReview').onclick=()=>setView('review');
 }
 
@@ -177,13 +155,13 @@ function renderReview(){
  function draw(arr){$('#reviewList').innerHTML=arr.length?`<div class="review-grid">${arr.map(listItem).join('')}</div>`:`<div class="card empty"><strong>まだありません</strong>一問一答を進めると、ここに復習対象がたまります。</div>`;wireList(arr)} draw(wrong);
  $$('[data-r]').forEach(b=>b.onclick=()=>{$$('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');draw(b.dataset.r==='wrong'?wrong:fav)});
 }
-function listItem(q){const x=p(q.uid),status=x.attempts?(x.last==='correct'?'<span class="status-pill ok">直近 正解</span>':'<span class="status-pill ng">直近 不正解</span>'):'<span class="status-pill">未回答</span>';return `<div class="card list-item" data-uid="${q.uid}"><div class="list-num">Q${q.id}</div><div><h3>${esc(q.question)}</h3><p>${esc(q.category)} ・ ${q.source} ・ ${x.attempts}回回答</p></div>${status}</div>`}
+function listItem(q){const x=p(q.uid),status=x.attempts?(x.last==='correct'?'<span class="status-pill ok">直近 正解</span>':'<span class="status-pill ng">直近 不正解</span>'):'<span class="status-pill">未回答</span>';const title=q.ja?.question||q.question;return `<div class="card list-item" data-uid="${q.uid}"><div class="list-num">Q${q.id}</div><div><h3>${esc(title)}</h3><p>${esc(q.category)} ・ ${q.source} ・ ${x.attempts}回回答</p></div>${status}</div>`}
 function wireList(arr){$$('[data-uid]').forEach(el=>el.onclick=()=>{const q=questions.find(x=>x.uid===el.dataset.uid);studySource=q.source;studyCategory='all';studyFilter='all';buildStudyPool();studyIndex=studyPool.findIndex(x=>x.uid===q.uid);setView('study')})}
 
 function renderLibrary(){
  const cats=[...new Set(questions.map(q=>q.category))].sort();
  $('#view-library').innerHTML=`<div class="filters"><input id="libSearch" class="search-input" placeholder="問題文・選択肢を検索"><select id="libSource" class="select"><option value="all">両方 196問</option><option value="2026-04-28">最新 116問</option><option value="2026-01-08">旧版 80問</option></select><select id="libCat" class="select"><option value="all">すべての分野</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div><div id="libList"></div>`;
- const draw=()=>{const s=$('#libSearch').value.toLowerCase(),src=$('#libSource').value,cat=$('#libCat').value;const arr=questions.filter(q=>(src==='all'||q.source===src)&&(cat==='all'||q.category===cat)&&(!s||(q.question+' '+Object.values(q.options).join(' ')).toLowerCase().includes(s)));$('#libList').innerHTML=arr.length?`<div class="library-list">${arr.map(listItem).join('')}</div>`:'<div class="card empty"><strong>見つかりません</strong>検索条件を変更してください。</div>';wireList(arr)};
+ const draw=()=>{const s=$('#libSearch').value.toLowerCase(),src=$('#libSource').value,cat=$('#libCat').value;const arr=questions.filter(q=>{const hay=[q.ja?.question||'',...Object.values(q.ja?.options||{}),q.question,...Object.values(q.options)].join(' ').toLowerCase();return (src==='all'||q.source===src)&&(cat==='all'||q.category===cat)&&(!s||hay.includes(s))});$('#libList').innerHTML=arr.length?`<div class="library-list">${arr.map(listItem).join('')}</div>`:'<div class="card empty"><strong>見つかりません</strong>検索条件を変更してください。</div>';wireList(arr)};
  $('#libSearch').oninput=draw;$('#libSource').onchange=draw;$('#libCat').onchange=draw;draw();
 }
 

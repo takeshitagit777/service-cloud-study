@@ -1,31 +1,33 @@
-# Service Cloud Study Lab
+# Service Cloud Consultant Study Lab
 
-Salesforce Certified Service Cloud Consultant の個人学習用Webアプリです。
+Salesforce Service Cloud Consultant の添付問題集（2026-04-28 / 116問、2026-01-08 / 80問）を使った個人学習用の静的 Web アプリです。
 
-## 収録
-- v2026-04-28: 116問
-- v2026-01-08: 80問
-- 合計196問（版ごとの重複問題はそのまま保持）
+## この版で直したこと
 
-## 主な機能
-- 一問一答
-- 日本語訳（オンデマンド翻訳 + ブラウザ保存）
-- 解説表示
-- 10 / 30 / 60問の模擬試験
-- 正答率、回答数、連続正解、分野別成績
-- 間違えた問題だけ復習
-- お気に入り
-- 学習データのJSON書き出し / 読み込み
-- ダーク / ライトテーマ
+- 日本語訳を全196問分、サイトデータに事前収録
+- Google 翻訳などの外部翻訳 API 呼び出しを完全に削除
+- `Trailhead`、`Einstein Next Best Action`、`Omni-Channel`、`Agentforce Service Agent` など Salesforce の製品名・機能名は原則として原文維持
+- 日本語の文章部分だけ自然な資格学習向け表現に整理
+- 問題の学習分類を見直し（現行試験ドメインを参考にした学習用分類）
+- PDF 原文に問いかけ文が欠けている問題は、画面上で「原文注意」と明示
+- 「EN 原文」で問題文・選択肢・解説を PDF 原文表示へ切替可能
+- 正解・解説は添付問題集の記載を基準とし、現行 Salesforce 仕様と異なる可能性がある旨を表示
+- 学習履歴は従来と同じ `localStorage` キーを維持するため、同じドメインで上書きデプロイすれば進捗を引き継げます
 
-## Vercelへ公開
-このフォルダをGitHubリポジトリに入れてVercelでImportするだけです。
-フレームワーク設定は `Other` のままで動作します。Build Command / Output Directory の指定は不要です。
+## Vercel
 
-Vercel CLIを使う場合は、このフォルダで `vercel` を実行してください。
+ビルド不要です。ファイル一式を GitHub リポジトリ直下へ置き、Vercel から Import → Deploy するだけです。
 
-## データ保存
-学習履歴はブラウザの `localStorage` に保存されます。端末を変える場合はアプリ内の「学習データを書き出す」でバックアップしてください。
+必要なファイル:
 
-## 翻訳
-`/api/translate` のVercel Functionから日本語訳を取得し、結果をブラウザ側にキャッシュします。翻訳サービス側が利用できない場合は英語原文を表示します。
+- `index.html`
+- `app.js`
+- `styles.css`
+- `questions.json`
+- `vercel.json`
+
+環境変数、API キー、データベースは不要です。
+
+## 注意
+
+このアプリは添付された問題集を学習素材として表示します。問題集自体に誤植・欠落・古い仕様が含まれる可能性があります。PDF 原文の欠落が確認できた問題については、その旨を画面上に表示しています。
