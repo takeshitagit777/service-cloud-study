@@ -1,178 +1,209 @@
-const $ = (s, el=document) => el.querySelector(s);
-const $$ = (s, el=document) => [...el.querySelectorAll(s)];
-const STORE_KEY='sc-study-v1';
-const STUDY_GOAL=80;
-let questions=[], currentView='dashboard', studyPool=[], studyIndex=0, studyFilter='all', studySource='2026-04-28', studyCategory='all';
-let mock=null;
-let state = JSON.parse(localStorage.getItem(STORE_KEY)||'null') || { progress:{}, streak:0, bestStreak:0, sessions:[], theme:'dark' };
+(() => {
+  'use strict';
 
-function save(){ localStorage.setItem(STORE_KEY,JSON.stringify(state)); }
-function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
-function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function p(uid){return state.progress[uid] || {attempts:0,correct:0,last:null,favorite:false};}
-function metrics(){
-  const vals=Object.values(state.progress), attempted=vals.filter(x=>x.attempts>0), attempts=attempted.reduce((a,x)=>a+x.attempts,0), correct=attempted.reduce((a,x)=>a+x.correct,0);
-  return {attempted:attempted.length, attempts, correct, accuracy:attempts?Math.round(correct/attempts*100):0, favorites:vals.filter(x=>x.favorite).length, wrong:vals.filter(x=>x.attempts>x.correct).length};
-}
-function applyTheme(){document.body.classList.toggle('light',state.theme==='light')}
+  const QUESTIONS = Array.isArray(window.QUESTIONS) ? window.QUESTIONS : [];
+  const STORAGE_KEY = 'serviceCloudConsultant196Ja_v1';
+  const CATEGORIES = [
+    {id:'industry', label:'業界知識'},
+    {id:'implementation', label:'実装戦略'},
+    {id:'solution', label:'Service Cloudソリューション設計'},
+    {id:'knowledge', label:'Knowledge管理'},
+    {id:'channels', label:'受付・インタラクションチャネル'},
+    {id:'case', label:'ケース管理'},
+    {id:'analytics', label:'コンタクトセンター分析'},
+    {id:'integrations', label:'システム連携・データ管理'}
+  ];
+  const SOURCE_LABELS = {
+    '2026-01-08': '2026-01-08版（80問）',
+    '2026-04-28': '2026-04-28版（116問）'
+  };
 
+  const defaultState = () => ({answers:{}, favorites:{}, mockHistory:[]});
+  let state = loadState();
+  let practice = {list:[], index:0, filter:'all', source:'all', answered:false, selected:null};
+  let mock = null;
+  let mockTimer = null;
 
-function setView(view){
-  currentView=view; $$('.view').forEach(v=>v.classList.remove('active')); $('#view-'+view).classList.add('active');
-  $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-  const titles={dashboard:'学習ダッシュボード',study:'一問一答',mock:'模擬試験',review:'復習',library:'問題一覧'}; $('#pageTitle').textContent=titles[view];
-  $('#sidebar').classList.remove('open'); render(view);
-}
-function render(view){ updateGlobal(); ({dashboard:renderDashboard,study:renderStudy,mock:renderMock,review:renderReview,library:renderLibrary}[view])(); }
-function updateGlobal(){const m=metrics();$('#sideAccuracy').textContent=m.accuracy+'%';$('#sideProgress').style.width=Math.min(100,m.attempted/questions.length*100)+'%';$('#sideSolved').textContent=`${m.attempted} / ${questions.length} 問に挑戦`;$('#topStreak').textContent=state.streak||0}
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? {...defaultState(), ...JSON.parse(raw)} : defaultState();
+    }catch(_){ return defaultState(); }
+  }
+  function saveState(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(_){} }
+  function esc(v){ return String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+  function pct(a,b){ return b ? Math.round(a/b*100) : 0; }
+  function catLabel(id){ return CATEGORIES.find(c=>c.id===id)?.label || id; }
+  function sourceClass(q){ return q.source==='2026-01-08' ? 'jan' : 'apr'; }
+  function sourceTag(q){ return `<span class="source-tag ${sourceClass(q)}">${esc(q.sourceLabel)} Q${q.sourceQuestion}</span>`; }
+  function sourceFilter(source){ return source==='all' ? QUESTIONS : QUESTIONS.filter(q=>q.source===source); }
+  function statsFor(list=QUESTIONS){
+    let attempted=0, correct=0;
+    list.forEach(q=>{ const a=state.answers[q.id]; if(a){attempted++; if(a.correct) correct++;} });
+    return {attempted, correct, total:list.length, rate:pct(correct,attempted)};
+  }
+  function wrongQuestions(){ return QUESTIONS.filter(q=>state.answers[q.id] && !state.answers[q.id].correct); }
 
-function renderDashboard(){
- const m=metrics(), cats=categoryStats(), recent=state.sessions.slice(-5).reverse();
- $('#view-dashboard').innerHTML=`
- <div class="grid stats-grid">
-  ${stat('✓','総合正答率',m.accuracy+'%',m.attempts?`${m.correct} / ${m.attempts} 正解`:'まだ回答がありません','green')}
-  ${stat('◎','挑戦した問題',m.attempted,`全 ${questions.length} 問`)}
-  ${stat('🔥','最高連続正解',state.bestStreak||0,'自己ベスト','')}
-  ${stat('↺','復習対象',m.wrong,`お気に入り ${m.favorites} 問`,'red')}
- </div>
- <div class="card big-action">
-   <p class="eyebrow">TODAY'S STUDY</p><h2>過去問を、ひたすら解く。</h2>
-   <p>最新116問と旧版80問を収録。日本語は事前に精査済みで、Trailhead / Omni-Channel / Einstein Next Best Action などの固有名詞は原文を維持します。外部翻訳APIへの通信はありません。</p>
-   <button class="primary-btn" id="dashStart">一問一答を始める →</button>
- </div>
- <div class="grid dashboard-grid" style="margin-top:16px">
-  <div class="card section-card"><div class="section-head"><div><h2>分野別パフォーマンス</h2><p>正答率が低い分野から優先して復習</p></div></div>
-   <div class="category-list">${cats.slice(0,8).map(c=>`<div class="cat-row"><span class="name">${esc(c.name)}</span><div class="bar"><i style="width:${c.acc}%"></i></div><b>${c.attempts?c.acc+'%':'--'}</b></div>`).join('')}</div>
-  </div>
-  <div class="card section-card"><div class="section-head"><div><h2>進捗</h2><p>一度でも回答した問題</p></div></div>
-    <div class="progress-ring" style="--p:${Math.round(m.attempted/questions.length*100)}"><div><strong>${Math.round(m.attempted/questions.length*100)}%</strong><span>${m.attempted}/${questions.length}</span></div></div>
-    <div style="margin-top:20px">${recent.length?recent.map(s=>`<div class="side-stat"><span>${esc(s.label)}</span><b>${s.score}%</b></div>`).join(''):'<div class="empty" style="padding:20px">模擬試験の結果がここに表示されます</div>'}</div>
-  </div>
- </div>`;
- $('#dashStart').onclick=()=>setView('study');
-}
-function stat(icon,label,val,sub,cls=''){return `<div class="card stat-card"><span class="stat-icon">${icon}</span><div class="stat-label">${label}</div><div class="stat-value ${cls}">${val}</div><div class="stat-sub">${sub}</div></div>`}
-function categoryStats(){
- const map={}; questions.forEach(q=>{map[q.category] ||= {name:q.category,attempts:0,correct:0}; const x=p(q.uid);map[q.category].attempts+=x.attempts;map[q.category].correct+=x.correct});
- return Object.values(map).map(x=>({...x,acc:x.attempts?Math.round(x.correct/x.attempts*100):0})).sort((a,b)=>a.attempts&&b.attempts?a.acc-b.acc:b.attempts-a.attempts);
-}
+  document.addEventListener('click', e => {
+    const nav = e.target.closest('[data-nav]');
+    if(nav){ switchView(nav.dataset.nav); }
+  });
 
-function buildStudyPool(){
- studyPool=questions.filter(q=>(studySource==='all'||q.source===studySource)&&(studyCategory==='all'||q.category===studyCategory));
- if(studyFilter==='wrong') studyPool=studyPool.filter(q=>p(q.uid).attempts>p(q.uid).correct);
- if(studyFilter==='unseen') studyPool=studyPool.filter(q=>p(q.uid).attempts===0);
- if(studyFilter==='favorite') studyPool=studyPool.filter(q=>p(q.uid).favorite);
- if(studyFilter==='random') studyPool=studyPool.sort(()=>Math.random()-.5);
- studyIndex=Math.min(studyIndex,Math.max(0,studyPool.length-1));
-}
-function renderStudy(){
- buildStudyPool(); const cats=[...new Set(questions.map(q=>q.category))].sort();
- $('#view-study').innerHTML=`<div class="filters">
-  <select id="studySource" class="select"><option value="2026-04-28">最新 116問</option><option value="2026-01-08">旧版 80問</option><option value="all">両方 196問</option></select>
-  <select id="studyCategory" class="select"><option value="all">すべての分野</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
-  ${[['all','すべて'],['unseen','未回答'],['wrong','間違い'],['favorite','★ お気に入り'],['random','シャッフル']].map(([v,l])=>`<button class="filter-chip ${studyFilter===v?'active':''}" data-filter="${v}">${l}</button>`).join('')}
- </div><div id="studyBody"></div>`;
- $('#studySource').value=studySource; $('#studyCategory').value=studyCategory;
- $('#studySource').onchange=e=>{studySource=e.target.value;studyIndex=0;renderStudy()}; $('#studyCategory').onchange=e=>{studyCategory=e.target.value;studyIndex=0;renderStudy()};
- $$('[data-filter]').forEach(b=>b.onclick=()=>{studyFilter=b.dataset.filter;studyIndex=0;renderStudy()});
- renderStudyQuestion();
-}
-function renderStudyQuestion(){
- const host=$('#studyBody'); if(!studyPool.length){host.innerHTML=`<div class="card empty"><strong>対象の問題がありません</strong>フィルターを変更してください。</div>`;return}
- const q=studyPool[studyIndex], prog=p(q.uid);
- host.innerHTML=`<div class="question-layout"><div class="card question-card" id="studyQuestion">${questionHTML(q,prog,false)}
-  <div class="question-actions"><div class="left-actions"><button class="tiny-btn ${prog.favorite?'active':''}" id="favBtn">★ お気に入り</button><button class="tiny-btn" id="showEnglish">EN 原文</button></div><div><button class="secondary-btn" id="prevQ" ${studyIndex===0?'disabled':''}>← 前へ</button> <button class="primary-btn" id="nextQ">次へ →</button></div></div>
- </div><aside class="card side-panel"><h3>学習ステータス</h3><div class="side-stat"><span>現在位置</span><b>${studyIndex+1} / ${studyPool.length}</b></div><div class="side-stat"><span>この問題の回答回数</span><b>${prog.attempts}</b></div><div class="side-stat"><span>この問題の正答率</span><b>${prog.attempts?Math.round(prog.correct/prog.attempts*100)+'%':'--'}</b></div><div class="jump-row"><input class="select" id="jumpNo" type="number" min="1" max="${studyPool.length}" value="${studyIndex+1}"><button class="secondary-btn" id="jumpBtn">移動</button></div><div class="keyboard-hint">ショートカット<br>1〜4: 選択肢 / →: 次へ / F: お気に入り</div></aside></div>`;
- wireQuestion($('#studyQuestion'),q,false);
- $('#favBtn').onclick=()=>{const x=p(q.uid);x.favorite=!x.favorite;state.progress[q.uid]=x;save();renderStudyQuestion()};
- $('#showEnglish').onclick=()=>toggleOriginal($('#studyQuestion'),$('#showEnglish'));
- $('#prevQ').onclick=()=>{studyIndex=Math.max(0,studyIndex-1);renderStudyQuestion()}; $('#nextQ').onclick=()=>{studyIndex=(studyIndex+1)%studyPool.length;renderStudyQuestion()};
- $('#jumpBtn').onclick=()=>{studyIndex=Math.max(0,Math.min(studyPool.length-1,(+$('#jumpNo').value||1)-1));renderStudyQuestion()};
-}
-function toggleOriginal(root,button){
- const on=root.classList.toggle('show-en'); if(button)button.textContent=on?'JP 日本語':'EN 原文';
-}
-function questionHTML(q,prog,isMock){
- const ja=q.ja||{question:q.question,options:q.options,explanation:q.explanation};
- const note=q.sourceNote?`<div class="source-note"><strong>原文注意</strong>${esc(q.sourceNote)}</div>`:'';
- const opts=Object.keys(q.options).map(l=>`<button class="option" data-answer="${l}"><span class="option-letter">${l}</span><span class="option-copy"><span class="option-text">${esc(ja.options[l]||q.options[l])}</span><span class="option-original">${esc(q.options[l])}</span></span></button>`).join('');
- return `<div class="question-meta"><span class="badge">${esc(q.category)}</span><span class="badge muted">${esc(q.source)}</span><span class="term-policy">固有名詞は原文維持</span><span class="question-no">Q${q.id}</span></div>
- ${note}<h2 class="question-text">${esc(ja.question)}</h2><div class="original-text"><span class="original-label">PDF原文</span>${esc(q.question)}</div>
- <div class="options">${opts}</div>
- <div class="answer-box"><div class="answer-title"></div><p>${esc(ja.explanation)}</p><div class="answer-source">※ 正解・解説は添付問題集の記載を基準にしています。Salesforce の仕様変更や元資料の誤植により、現行仕様と異なる可能性があります。</div><div class="original-text answer-original" style="margin-top:10px"><span class="original-label">PDF原文の解説</span>${esc(q.explanation)}</div></div>`;
-}
-function wireQuestion(root,q,isMock){
- $$('.option',root).forEach(btn=>btn.onclick=()=>{
-   if(isMock){mock.answers[q.uid]=btn.dataset.answer;saveMockSelection(root,btn.dataset.answer);return}
-   if(root.dataset.answered==='1') return; root.dataset.answered='1'; const selected=btn.dataset.answer, ok=selected===q.answer;
-   const x=p(q.uid);x.attempts++;x.correct+=ok?1:0;x.last=ok?'correct':'wrong';x.lastAt=Date.now();state.progress[q.uid]=x;
-   if(ok){state.streak=(state.streak||0)+1;state.bestStreak=Math.max(state.bestStreak||0,state.streak)}else state.streak=0;save();
-   $$('.option',root).forEach(o=>{o.disabled=true;if(o.dataset.answer===q.answer)o.classList.add('correct');if(o.dataset.answer===selected&&!ok)o.classList.add('wrong')});
-   const box=$('.answer-box',root);box.classList.add('show');$('.answer-title',box).innerHTML=ok?'<span class="green">✓ 正解</span>':'<span class="red">✕ 不正解</span> <span>問題集記載の正解: '+q.answer+'</span>';updateGlobal();
- });
-}
-function saveMockSelection(root,l){$$('.option',root).forEach(o=>o.classList.toggle('selected',o.dataset.answer===l));renderMockFooter()}
+  function switchView(id){
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));
+    document.querySelectorAll('.nav-item').forEach(v=>v.classList.toggle('active',v.dataset.nav===id));
+    clearMockTimer();
+    document.getElementById('topTimer').textContent='';
+    if(id==='home') renderHome();
+    if(id==='practice') startPractice(practice.filter || 'all', practice.source || 'all');
+    if(id==='mock') renderMockLanding();
+    if(id==='review') renderReview();
+    if(id==='analysis') renderAnalysis();
+    if(id==='bank') renderBank();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
 
-function renderMock(){
- if(mock?.finished){renderMockResult();return} if(mock?.active){renderMockQuestion();return}
- $('#view-mock').innerHTML=`<div class="card mock-setup"><p class="eyebrow">MOCK EXAM</p><h2>模擬試験を作成</h2><p style="color:var(--muted);font-size:12px;line-height:1.8">最新116問からランダム出題。途中では正解を表示せず、最後に点数と分野別成績をまとめて表示します。</p>
- <div class="mode-grid">${[[10,'クイック'],[30,'集中'],[60,'本番練習']].map(([n,l],i)=>`<div class="mode-card ${i===0?'active':''}" data-count="${n}"><strong>${n}問</strong><span>${l}モード</span></div>`).join('')}</div>
- <div class="filters"><select id="mockSource" class="select"><option value="2026-04-28">最新 116問</option><option value="all">両方 196問</option></select><label class="filter-chip"><input type="checkbox" id="mockTimer"> 60問では105分タイマーを使う</label></div>
- <button class="primary-btn" id="startMock">試験を開始 →</button></div>`;
- let count=10;$$('.mode-card').forEach(c=>c.onclick=()=>{$$('.mode-card').forEach(x=>x.classList.remove('active'));c.classList.add('active');count=+c.dataset.count});
- $('#startMock').onclick=()=>startMock(count,$('#mockSource').value,$('#mockTimer').checked);
-}
-function startMock(count,source,useTimer){
- let pool=questions.filter(q=>source==='all'||q.source===source).sort(()=>Math.random()-.5).slice(0,count);
- mock={active:true,finished:false,questions:pool,index:0,answers:{},started:Date.now(),duration:useTimer&&count===60?105*60:null,timer:null};
- if(mock.duration){mock.timer=setInterval(()=>{if(!mock?.active)return;const left=mock.duration-Math.floor((Date.now()-mock.started)/1000);const el=$('#mockTimerDisplay');if(el)el.textContent=formatTime(Math.max(0,left));if(left<=0)finishMock()},1000)}
- renderMockQuestion();
-}
-function formatTime(s){return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
-function renderMockQuestion(){
- const q=mock.questions[mock.index]; const selected=mock.answers[q.uid];
- $('#view-mock').innerHTML=`<div class="question-layout"><div class="card question-card" id="mockQuestion">${questionHTML(q,p(q.uid),true)}</div><aside class="card side-panel"><h3>模擬試験</h3><div class="side-stat"><span>進捗</span><b>${mock.index+1} / ${mock.questions.length}</b></div><div class="side-stat"><span>回答済み</span><b>${Object.keys(mock.answers).length}</b></div>${mock.duration?`<div class="side-stat"><span>残り時間</span><b class="timer" id="mockTimerDisplay">${formatTime(Math.max(0,mock.duration-Math.floor((Date.now()-mock.started)/1000)))}</b></div>`:''}<button class="tiny-btn source-toggle" id="mockEnglish">EN 原文</button></aside></div><div id="mockFooter"></div>`;
- const root=$('#mockQuestion');wireQuestion(root,q,true); if(selected)saveMockSelection(root,selected); $('#mockEnglish').onclick=()=>toggleOriginal(root,$('#mockEnglish'));renderMockFooter();
-}
-function renderMockFooter(){
- const h=$('#mockFooter');if(!h||!mock)return;h.innerHTML=`<div class="card mock-footer"><div class="mock-dots">${mock.questions.map((q,i)=>`<i class="mock-dot ${mock.answers[q.uid]?'done':''} ${i===mock.index?'current':''}"></i>`).join('')}</div><div><button class="secondary-btn" id="mockPrev" ${mock.index===0?'disabled':''}>←</button> ${mock.index===mock.questions.length-1?'<button class="primary-btn" id="finishMock">採点する</button>':'<button class="primary-btn" id="mockNext">次へ →</button>'}</div></div>`;
- if($('#mockPrev'))$('#mockPrev').onclick=()=>{mock.index--;renderMockQuestion()};if($('#mockNext'))$('#mockNext').onclick=()=>{mock.index++;renderMockQuestion()};if($('#finishMock'))$('#finishMock').onclick=finishMock;
-}
-function finishMock(){
- if(!mock||mock.finished)return; if(mock.timer)clearInterval(mock.timer); let correct=0;
- mock.questions.forEach(q=>{const ans=mock.answers[q.uid];if(ans===q.answer)correct++;if(ans){const x=p(q.uid);x.attempts++;x.correct+=ans===q.answer?1:0;x.last=ans===q.answer?'correct':'wrong';x.lastAt=Date.now();state.progress[q.uid]=x}});
- const score=Math.round(correct/mock.questions.length*100);state.sessions.push({at:Date.now(),label:`模擬 ${mock.questions.length}問`,score,correct,total:mock.questions.length});state.sessions=state.sessions.slice(-30);state.streak=0;save();mock.result={score,correct};mock.active=false;mock.finished=true;renderMockResult();updateGlobal();
-}
-function renderMockResult(){
- const r=mock.result, pass=r.score>=STUDY_GOAL, cat={};mock.questions.forEach(q=>{cat[q.category]||={n:0,c:0};cat[q.category].n++;if(mock.answers[q.uid]===q.answer)cat[q.category].c++});
- $('#view-mock').innerHTML=`<div class="card result-hero"><p class="eyebrow">RESULT</p><div class="score-big ${pass?'green':'red'}">${r.score}<span> / 100</span></div><div class="result-status">${pass?`学習目標 ${STUDY_GOAL}% をクリア`:`${STUDY_GOAL}%まであと ${Math.max(0,STUDY_GOAL-r.score)}pt`}</div><p style="color:var(--muted);font-size:11px">※ ${STUDY_GOAL}%はこのアプリ内の学習目標で、Salesforce 公式の合格ラインを示すものではありません。</p><div class="result-grid"><div class="result-mini"><b>${r.correct}</b><span>正解</span></div><div class="result-mini"><b>${mock.questions.length-r.correct}</b><span>不正解</span></div><div class="result-mini"><b>${Object.keys(mock.answers).length}</b><span>回答数</span></div></div><button class="primary-btn" id="retryMock">もう一度</button> <button class="secondary-btn" id="goReview">間違いを復習</button></div><div class="card section-card" style="margin-top:16px"><div class="section-head"><h2>分野別スコア</h2></div><div class="category-list">${Object.entries(cat).map(([n,x])=>{const a=Math.round(x.c/x.n*100);return `<div class="cat-row"><span class="name">${esc(n)}</span><div class="bar"><i style="width:${a}%"></i></div><b>${a}%</b></div>`}).join('')}</div></div>`;
- $('#retryMock').onclick=()=>{mock=null;renderMock()};$('#goReview').onclick=()=>setView('review');
-}
+  function renderHome(){
+    const s=statsFor();
+    const wrong=wrongQuestions().length;
+    const jan=statsFor(QUESTIONS.filter(q=>q.source==='2026-01-08'));
+    const apr=statsFor(QUESTIONS.filter(q=>q.source==='2026-04-28'));
+    document.getElementById('home').innerHTML = `
+      <div class="hero">
+        <div class="hero-kicker">Salesforce Service Cloud Consultant</div>
+        <h1>過去問 196問を日本語で学習</h1>
+        <p>2026-01-08版の80問と、2026-04-28版の116問を両方そのまま収録しています。重複問題も削除せず、出典ごとに別問題として保持。学習履歴はこのブラウザに自動保存されます。</p>
+        <div class="hero-actions"><button class="btn primary" onclick="switchView('practice')">一問一答を始める</button><button class="btn" onclick="switchView('mock')">60問模試を受ける</button></div>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="muted small">回答済み</div><div class="stat">${s.attempted}<span class="muted" style="font-size:15px"> / 196</span></div><div class="progress"><div style="width:${pct(s.attempted,196)}%"></div></div></div>
+        <div class="card"><div class="muted small">累計正答率</div><div class="stat">${s.rate}%</div><div class="muted small">回答済み問題ベース</div></div>
+        <div class="card"><div class="muted small">要復習</div><div class="stat">${wrong}</div><div class="muted small">最後の回答が不正解の問題</div></div>
+      </div>
+      <div class="section-title"><h2>収録元</h2><p class="muted small">2つのPDFを統合・重複保持</p></div>
+      <div class="source-grid">
+        <div class="card source-card"><div class="source-number">80</div><div><strong>2026-01-08版</strong><div class="muted small">${jan.attempted}/80問回答・正答率 ${jan.rate}%</div></div></div>
+        <div class="card source-card"><div class="source-number">116</div><div><strong>2026-04-28版</strong><div class="muted small">${apr.attempted}/116問回答・正答率 ${apr.rate}%</div></div></div>
+      </div>
+      <div class="section-title"><h2>分野別進捗</h2></div>
+      <div class="card">${CATEGORIES.map(c=>{const list=QUESTIONS.filter(q=>q.category===c.id);const x=statsFor(list);return `<div class="category-row"><div><strong>${esc(c.label)}</strong><div class="muted small">${x.attempted}/${list.length}問回答</div></div><div><div class="progress"><div style="width:${x.rate}%"></div></div></div><strong style="text-align:right">${x.rate}%</strong></div>`;}).join('')}</div>
+      <div class="section-title"><h2>データ管理</h2></div>
+      <div class="card"><div class="actions" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn danger" onclick="resetProgress()">学習履歴をリセット</button></div><div class="muted small" style="margin-top:9px">履歴はlocalStorageに保存され、GitHub/Vercel側へ送信されません。</div></div>
+      <div class="footer-note">Service Cloud Consultant 自習用・日本語学習サイト</div>`;
+  }
 
-function renderReview(){
- const wrong=questions.filter(q=>p(q.uid).attempts>p(q.uid).correct), fav=questions.filter(q=>p(q.uid).favorite);
- $('#view-review').innerHTML=`<div class="filters"><button class="filter-chip active" data-r="wrong">間違えた問題 ${wrong.length}</button><button class="filter-chip" data-r="fav">お気に入り ${fav.length}</button></div><div id="reviewList"></div>`;
- function draw(arr){$('#reviewList').innerHTML=arr.length?`<div class="review-grid">${arr.map(listItem).join('')}</div>`:`<div class="card empty"><strong>まだありません</strong>一問一答を進めると、ここに復習対象がたまります。</div>`;wireList(arr)} draw(wrong);
- $$('[data-r]').forEach(b=>b.onclick=()=>{$$('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');draw(b.dataset.r==='wrong'?wrong:fav)});
-}
-function listItem(q){const x=p(q.uid),status=x.attempts?(x.last==='correct'?'<span class="status-pill ok">直近 正解</span>':'<span class="status-pill ng">直近 不正解</span>'):'<span class="status-pill">未回答</span>';const title=q.ja?.question||q.question;return `<div class="card list-item" data-uid="${q.uid}"><div class="list-num">Q${q.id}</div><div><h3>${esc(title)}</h3><p>${esc(q.category)} ・ ${q.source} ・ ${x.attempts}回回答</p></div>${status}</div>`}
-function wireList(arr){$$('[data-uid]').forEach(el=>el.onclick=()=>{const q=questions.find(x=>x.uid===el.dataset.uid);studySource=q.source;studyCategory='all';studyFilter='all';buildStudyPool();studyIndex=studyPool.findIndex(x=>x.uid===q.uid);setView('study')})}
+  function sourceSelect(value='all'){
+    return `<select id="sourceFilter" aria-label="出典"><option value="all" ${value==='all'?'selected':''}>全196問</option><option value="2026-01-08" ${value==='2026-01-08'?'selected':''}>2026-01-08版（80問）</option><option value="2026-04-28" ${value==='2026-04-28'?'selected':''}>2026-04-28版（116問）</option></select>`;
+  }
+  function practiceFilterSelect(value='all'){
+    return `<select id="practiceFilter" aria-label="問題フィルター"><option value="all" ${value==='all'?'selected':''}>すべて</option><option value="unanswered" ${value==='unanswered'?'selected':''}>未回答</option><option value="wrong" ${value==='wrong'?'selected':''}>間違いのみ</option><option value="fav" ${value==='fav'?'selected':''}>お気に入り</option>${CATEGORIES.map(c=>`<option value="${c.id}" ${value===c.id?'selected':''}>${esc(c.label)}</option>`).join('')}</select>`;
+  }
 
-function renderLibrary(){
- const cats=[...new Set(questions.map(q=>q.category))].sort();
- $('#view-library').innerHTML=`<div class="filters"><input id="libSearch" class="search-input" placeholder="問題文・選択肢を検索"><select id="libSource" class="select"><option value="all">両方 196問</option><option value="2026-04-28">最新 116問</option><option value="2026-01-08">旧版 80問</option></select><select id="libCat" class="select"><option value="all">すべての分野</option>${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div><div id="libList"></div>`;
- const draw=()=>{const s=$('#libSearch').value.toLowerCase(),src=$('#libSource').value,cat=$('#libCat').value;const arr=questions.filter(q=>{const hay=[q.ja?.question||'',...Object.values(q.ja?.options||{}),q.question,...Object.values(q.options)].join(' ').toLowerCase();return (src==='all'||q.source===src)&&(cat==='all'||q.category===cat)&&(!s||hay.includes(s))});$('#libList').innerHTML=arr.length?`<div class="library-list">${arr.map(listItem).join('')}</div>`:'<div class="card empty"><strong>見つかりません</strong>検索条件を変更してください。</div>';wireList(arr)};
- $('#libSearch').oninput=draw;$('#libSource').onchange=draw;$('#libCat').onchange=draw;draw();
-}
+  function buildPracticeList(filter='all', source='all'){
+    let list=sourceFilter(source);
+    if(filter==='wrong') list=list.filter(q=>state.answers[q.id] && !state.answers[q.id].correct);
+    else if(filter==='fav') list=list.filter(q=>state.favorites[q.id]);
+    else if(filter==='unanswered') list=list.filter(q=>!state.answers[q.id]);
+    else if(filter!=='all') list=list.filter(q=>q.category===filter);
+    return shuffle(list);
+  }
 
-function exportData(){const blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='service-cloud-study-backup.json';a.click();URL.revokeObjectURL(a.href)}
-function importData(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.state)throw 0;state=d.state;save();applyTheme();render(currentView);toast('学習データを読み込みました')}catch(e){toast('読み込みに失敗しました')}};r.readAsText(file)}
+  window.startPractice = function(filter='all', source='all'){
+    practice={list:buildPracticeList(filter,source),index:0,filter,source,answered:false,selected:null};
+    renderPractice();
+  };
+  function renderPractice(){
+    const root=document.getElementById('practice');
+    if(!practice.list.length){
+      root.innerHTML=`<div class="toolbar">${sourceSelect(practice.source)}${practiceFilterSelect(practice.filter)}<button class="btn" onclick="applyPracticeFilters()">適用</button></div><div class="card empty">条件に該当する問題がありません。</div>`;return;
+    }
+    const q=practice.list[practice.index];
+    root.innerHTML=`
+      <div class="toolbar">${sourceSelect(practice.source)}${practiceFilterSelect(practice.filter)}<button class="btn" onclick="applyPracticeFilters()">適用</button><button class="btn" onclick="reshufflePractice()">🔀 並び替え</button><div class="spacer"></div><span class="muted small">${practice.index+1} / ${practice.list.length}</span></div>
+      ${questionCard(q,practice.selected,practice.answered,'practice')}`;
+  }
+  window.applyPracticeFilters=function(){ startPractice(document.getElementById('practiceFilter').value,document.getElementById('sourceFilter').value); };
+  window.reshufflePractice=function(){ practice.list=shuffle(practice.list);practice.index=0;practice.answered=false;practice.selected=null;renderPractice(); };
+  window.answerPractice=function(choice){
+    if(practice.answered) return;
+    const q=practice.list[practice.index];
+    const correct=choice===q.answer;
+    state.answers[q.id]={choice,correct,at:Date.now()};saveState();
+    practice.selected=choice;practice.answered=true;renderPractice();
+  };
+  window.nextPractice=function(delta){
+    const next=practice.index+delta;if(next<0||next>=practice.list.length)return;
+    practice.index=next;practice.answered=false;practice.selected=null;renderPractice();window.scrollTo({top:0,behavior:'smooth'});
+  };
+  window.toggleFavorite=function(id,rerender='practice'){
+    state.favorites[id]=!state.favorites[id];if(!state.favorites[id])delete state.favorites[id];saveState();
+    if(rerender==='practice')renderPractice();if(rerender==='review')renderReview();
+  };
 
-async function init(){
- questions=await fetch('./questions.json').then(r=>r.json()); applyTheme();
- $$('.nav-item').forEach(b=>b.onclick=()=>setView(b.dataset.view));$('#themeBtn').onclick=()=>{state.theme=state.theme==='light'?'dark':'light';save();applyTheme()};$('#menuBtn').onclick=()=>$('#sidebar').classList.toggle('open');
- $('#exportBtn').onclick=exportData;$('#importInput').onchange=e=>e.target.files[0]&&importData(e.target.files[0]);
- document.addEventListener('keydown',e=>{if(currentView!=='study'||!studyPool.length||['INPUT','SELECT'].includes(document.activeElement.tagName))return;const q=studyPool[studyIndex],root=$('#studyQuestion');if(['1','2','3','4'].includes(e.key)){const l=['A','B','C','D'][+e.key-1];const b=$(`.option[data-answer="${l}"]`,root);if(b&&!b.disabled)b.click()}if(e.key==='ArrowRight')$('#nextQ')?.click();if(e.key.toLowerCase()==='f')$('#favBtn')?.click()});
- renderDashboard();updateGlobal();
-}
-init();
+  function questionCard(q,selected,answered,mode){
+    const fav=!!state.favorites[q.id];
+    const choices=q.choices.map((c,i)=>{
+      let cls='choice'; if(answered){if(i===q.answer)cls+=' correct'; else if(i===selected)cls+=' wrong';} else if(i===selected)cls+=' selected';
+      const handler=mode==='practice'?`answerPractice(${i})`:'';
+      return `<button class="${cls}" ${answered||mode!=='practice'?'disabled':''} ${handler?`onclick="${handler}"`:''}><span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(c)}</span></button>`;
+    }).join('');
+    const result=answered?`<div class="explain"><strong class="${selected===q.answer?'good-text':'bad-text'}">${selected===q.answer?'正解！':'不正解'}　正解：${String.fromCharCode(65+q.answer)}. ${esc(q.choices[q.answer])}</strong>${esc(q.explanation)}</div>`:'';
+    return `<div class="question-card"><div class="q-head"><div class="q-meta"><span class="q-number">${esc(q.id)}</span>${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span><span class="tag">${esc(q.concept)}</span></div><button class="heart ${fav?'on':''}" onclick="toggleFavorite('${q.id}','${mode}')" aria-label="お気に入り">${fav?'♥':'♡'}</button></div><div class="q-text">${esc(q.question)}</div><div class="choices">${choices}</div>${result}<div class="quiz-footer"><button class="btn" onclick="nextPractice(-1)" ${practice.index===0?'disabled':''}>← 前へ</button><div class="spacer"></div><button class="btn primary" onclick="nextPractice(1)" ${practice.index===practice.list.length-1?'disabled':''}>次へ →</button></div></div>`;
+  }
+
+  function renderMockLanding(){
+    document.getElementById('mock').innerHTML=`<div class="hero"><div class="hero-kicker">Mock Exam</div><h1>60問 模擬試験</h1><p>196問から60問をランダム出題します。出典を片方に絞ることもできます。制限時間は105分。終了後に正答率と分野別結果を確認できます。</p></div><div class="section-title"><h2>模試設定</h2></div><div class="card"><div class="toolbar">${sourceSelect('all')}<button class="btn primary" onclick="startMockFromUi()">模試を開始</button></div><div class="muted small">※同一内容の問題が2つのPDFに収録されている場合も、別問題として抽選対象になります。</div></div>${state.mockHistory.length?mockHistoryHtml():''}`;
+  }
+  function mockHistoryHtml(){return `<div class="section-title"><h2>最近の模試</h2></div><div class="card table-wrap"><table class="table"><thead><tr><th>日時</th><th>出典</th><th>正答</th><th>正答率</th></tr></thead><tbody>${state.mockHistory.slice(0,8).map(h=>`<tr><td>${new Date(h.at).toLocaleString('ja-JP')}</td><td>${esc(h.sourceLabel)}</td><td>${h.correct}/${h.total}</td><td>${h.rate}%</td></tr>`).join('')}</tbody></table></div>`;}
+  window.startMockFromUi=function(){ startMock(document.getElementById('sourceFilter').value); };
+  function startMock(source='all'){
+    const pool=sourceFilter(source);const size=Math.min(60,pool.length);
+    mock={questions:shuffle(pool).slice(0,size),index:0,answers:{},flagged:{},startedAt:Date.now(),duration:105*60,source};
+    renderMock();startMockTimer();
+  }
+  function startMockTimer(){clearMockTimer();updateTimer();mockTimer=setInterval(updateTimer,1000);}
+  function clearMockTimer(){if(mockTimer){clearInterval(mockTimer);mockTimer=null;}}
+  function updateTimer(){if(!mock)return;const left=Math.max(0,mock.duration-Math.floor((Date.now()-mock.startedAt)/1000));const mm=String(Math.floor(left/60)).padStart(2,'0'),ss=String(left%60).padStart(2,'0');document.getElementById('topTimer').textContent=`残り ${mm}:${ss}`;if(left<=0)finishMock();}
+  function renderMock(){
+    const root=document.getElementById('mock'),q=mock.questions[mock.index],selected=mock.answers[q.id];
+    root.innerHTML=`<div class="mock-layout"><div class="question-card"><div class="q-head"><div class="q-meta"><span class="q-number">${mock.index+1} / ${mock.questions.length}</span>${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span></div><button class="heart ${mock.flagged[q.id]?'on':''}" onclick="toggleMockFlag('${q.id}')">⚑</button></div><div class="q-text">${esc(q.question)}</div><div class="choices">${q.choices.map((c,i)=>`<button class="choice ${selected===i?'selected':''}" onclick="answerMock(${i})"><span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(c)}</span></button>`).join('')}</div><div class="quiz-footer"><button class="btn" onclick="goMock(-1)" ${mock.index===0?'disabled':''}>← 前へ</button><div class="spacer"></div><button class="btn" onclick="goMock(1)" ${mock.index===mock.questions.length-1?'disabled':''}>次へ →</button><button class="btn primary" onclick="confirmFinishMock()">採点する</button></div></div><aside class="card mock-side"><strong>問題一覧</strong><div class="q-grid" style="margin-top:10px">${mock.questions.map((x,i)=>`<button class="${mock.answers[x.id]!==undefined?'answered':''} ${i===mock.index?'current':''} ${mock.flagged[x.id]?'flagged':''}" onclick="jumpMock(${i})">${i+1}</button>`).join('')}</div><div class="mock-summary"><div class="mock-summary-row"><span class="muted">回答済み</span><strong>${Object.keys(mock.answers).length}/${mock.questions.length}</strong></div><div class="mock-summary-row"><span class="muted">見直し</span><strong>${Object.keys(mock.flagged).length}</strong></div></div></aside></div>`;
+  }
+  window.answerMock=function(i){mock.answers[mock.questions[mock.index].id]=i;renderMock();};
+  window.goMock=function(d){const i=mock.index+d;if(i>=0&&i<mock.questions.length){mock.index=i;renderMock();window.scrollTo({top:0,behavior:'smooth'});}};
+  window.jumpMock=function(i){mock.index=i;renderMock();window.scrollTo({top:0,behavior:'smooth'});};
+  window.toggleMockFlag=function(id){mock.flagged[id]=!mock.flagged[id];if(!mock.flagged[id])delete mock.flagged[id];renderMock();};
+  window.confirmFinishMock=function(){const remain=mock.questions.length-Object.keys(mock.answers).length;if(remain&&!confirm(`未回答が${remain}問あります。採点しますか？`))return;finishMock();};
+  function finishMock(){if(!mock)return;clearMockTimer();let correct=0;mock.questions.forEach(q=>{const choice=mock.answers[q.id];if(choice===q.answer)correct++;if(choice!==undefined){state.answers[q.id]={choice,correct:choice===q.answer,at:Date.now()};}});const rate=pct(correct,mock.questions.length);state.mockHistory.unshift({at:Date.now(),source:mock.source,sourceLabel:mock.source==='all'?'全196問':SOURCE_LABELS[mock.source],correct,total:mock.questions.length,rate});state.mockHistory=state.mockHistory.slice(0,20);saveState();renderMockResult(correct,rate);}
+  function renderMockResult(correct,rate){
+    const qs=mock.questions;document.getElementById('topTimer').textContent='';
+    const catRows=CATEGORIES.map(c=>{const list=qs.filter(q=>q.category===c.id);if(!list.length)return'';const ok=list.filter(q=>mock.answers[q.id]===q.answer).length;return `<tr><td>${esc(c.label)}</td><td>${ok}/${list.length}</td><td>${pct(ok,list.length)}%</td></tr>`;}).join('');
+    document.getElementById('mock').innerHTML=`<div class="card result-hero"><div class="muted">模擬試験結果</div><div class="score ${rate>=65?'good-text':'bad-text'}">${rate}%</div><div><strong>${correct} / ${qs.length} 問正解</strong></div><div style="margin-top:16px"><button class="btn primary" onclick="renderMockLanding()">もう一度受ける</button></div></div><div class="grid two"><div class="card table-wrap"><h3>分野別</h3><table class="table"><thead><tr><th>分野</th><th>正解</th><th>正答率</th></tr></thead><tbody>${catRows}</tbody></table></div><div class="card"><h3>復習ポイント</h3><p class="muted">不正解だった問題は「間違い復習」に自動追加されます。一問一答の回答履歴にも反映されています。</p><button class="btn" onclick="switchView('review')">間違いを復習する</button></div></div>`;mock=null;
+  }
+
+  function renderReview(){
+    const list=wrongQuestions();const root=document.getElementById('review');
+    if(!list.length){root.innerHTML='<div class="card empty">現在、要復習の問題はありません。🎉</div>';return;}
+    root.innerHTML=`<div class="section-title"><h2>間違い復習</h2><span class="muted small">${list.length}問</span></div><div class="bank-list">${list.map(q=>{const a=state.answers[q.id];return `<div class="bank-item" onclick="openQuestionFromBank('${q.id}')"><div class="bank-top">${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span><span class="tag">${esc(q.concept)}</span></div><div class="bank-q">${esc(q.question)}</div><div class="bank-answer">あなたの回答：${a.choice!==undefined?String.fromCharCode(65+a.choice):'-'} ／ 正解：${String.fromCharCode(65+q.answer)}. ${esc(q.choices[q.answer])}</div></div>`;}).join('')}</div>`;
+  }
+
+  function renderAnalysis(){
+    const all=statsFor();const jan=statsFor(QUESTIONS.filter(q=>q.source==='2026-01-08')),apr=statsFor(QUESTIONS.filter(q=>q.source==='2026-04-28'));
+    document.getElementById('analysis').innerHTML=`<div class="section-title"><h2>学習分析</h2></div><div class="grid"><div class="card"><div class="muted small">全体正答率</div><div class="stat">${all.rate}%</div><div>${all.correct}/${all.attempted} 正解</div></div><div class="card"><div class="muted small">80問版</div><div class="stat">${jan.rate}%</div><div>${jan.attempted}/80 回答</div></div><div class="card"><div class="muted small">116問版</div><div class="stat">${apr.rate}%</div><div>${apr.attempted}/116 回答</div></div></div><div class="section-title"><h2>分野別</h2></div><div class="card table-wrap"><table class="table"><thead><tr><th>分野</th><th>問題数</th><th>回答済み</th><th>正解</th><th>正答率</th></tr></thead><tbody>${CATEGORIES.map(c=>{const list=QUESTIONS.filter(q=>q.category===c.id),s=statsFor(list);return `<tr><td>${esc(c.label)}</td><td>${list.length}</td><td>${s.attempted}</td><td>${s.correct}</td><td><strong>${s.rate}%</strong></td></tr>`;}).join('')}</tbody></table></div>`;
+  }
+
+  function renderBank(){
+    const root=document.getElementById('bank');root.innerHTML=`<div class="section-title"><h2>問題バンク</h2><span class="muted small">196問</span></div><div class="toolbar">${sourceSelect('all')}<select id="bankCategory"><option value="all">全分野</option>${CATEGORIES.map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join('')}</select><input id="bankSearch" type="search" placeholder="問題文・選択肢・論点を検索" /><button class="btn" onclick="applyBankFilter()">検索</button></div><div id="bankResults"></div>`;applyBankFilter();
+  }
+  window.applyBankFilter=function(){
+    const source=document.getElementById('sourceFilter')?.value||'all',cat=document.getElementById('bankCategory')?.value||'all',term=(document.getElementById('bankSearch')?.value||'').trim().toLowerCase();let list=sourceFilter(source);if(cat!=='all')list=list.filter(q=>q.category===cat);if(term)list=list.filter(q=>[q.question,q.concept,...q.choices].join(' ').toLowerCase().includes(term));
+    document.getElementById('bankResults').innerHTML=list.length?`<div class="bank-list">${list.map(q=>`<div class="bank-item" onclick="openQuestionFromBank('${q.id}')"><div class="bank-top">${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span><span class="tag">${esc(q.concept)}</span></div><div class="bank-q">${esc(q.question)}</div><div class="bank-answer">正解：${String.fromCharCode(65+q.answer)}. ${esc(q.choices[q.answer])}</div></div>`).join('')}</div>`:'<div class="card empty">該当する問題がありません。</div>';
+  };
+  window.openQuestionFromBank=function(id){const q=QUESTIONS.find(x=>x.id===id);if(!q)return;practice={list:[q],index:0,filter:'all',source:'all',answered:false,selected:null};document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='practice'));document.querySelectorAll('.nav-item').forEach(v=>v.classList.toggle('active',v.dataset.nav==='practice'));renderPractice();window.scrollTo({top:0,behavior:'smooth'});};
+  window.resetProgress=function(){if(!confirm('回答履歴・お気に入り・模試履歴をすべて削除しますか？'))return;state=defaultState();saveState();renderHome();};
+
+  window.switchView = switchView;
+  window.renderMockLanding = renderMockLanding;
+
+  if(QUESTIONS.length!==196){document.getElementById('home').innerHTML=`<div class="notice">問題データの読み込みに失敗しました（${QUESTIONS.length}/196問）。data/questions.js を確認してください。</div>`;}else{renderHome();}
+})();

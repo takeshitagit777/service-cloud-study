@@ -1,33 +1,83 @@
-# Service Cloud Consultant Study Lab
+# Service Cloud Consultant Cert Lab - 196問 日本語版
 
-Salesforce Service Cloud Consultant の添付問題集（2026-04-28 / 116問、2026-01-08 / 80問）を使った個人学習用の静的 Web アプリです。
+Salesforce Service Cloud Consultant の学習用静的Webサイトです。
 
-## この版で直したこと
+## 収録内容
 
-- 日本語訳を全196問分、サイトデータに事前収録
-- Google 翻訳などの外部翻訳 API 呼び出しを完全に削除
-- `Trailhead`、`Einstein Next Best Action`、`Omni-Channel`、`Agentforce Service Agent` など Salesforce の製品名・機能名は原則として原文維持
-- 日本語の文章部分だけ自然な資格学習向け表現に整理
-- 問題の学習分類を見直し（現行試験ドメインを参考にした学習用分類）
-- PDF 原文に問いかけ文が欠けている問題は、画面上で「原文注意」と明示
-- 「EN 原文」で問題文・選択肢・解説を PDF 原文表示へ切替可能
-- 正解・解説は添付問題集の記載を基準とし、現行 Salesforce 仕様と異なる可能性がある旨を表示
-- 学習履歴は従来と同じ `localStorage` キーを維持するため、同じドメインで上書きデプロイすれば進捗を引き継げます
+- `2026-01-08版`: 80問
+- `2026-04-28版`: 116問
+- 合計: **196問**
+- 2つの版で重複する問題も削除せず、出典ごとに別問題として収録
+- 問題文・選択肢・解説は日本語化
+- Salesforce / Agentforce / Apex / REST API / Slack など、固有の製品名・技術名は必要に応じて原表記を保持
 
-## Vercel
+## 主な機能
 
-ビルド不要です。ファイル一式を GitHub リポジトリ直下へ置き、Vercel から Import → Deploy するだけです。
+- 一問一答
+- 2026-01-08版 / 2026-04-28版で絞り込み
+- 未回答・間違い・お気に入り・分野別フィルター
+- 60問ランダム模擬試験（105分）
+- 間違い復習
+- 分野別・出典別の学習分析
+- 196問の問題バンク検索
+- 学習履歴をブラウザの `localStorage` に保存
 
-必要なファイル:
+## ファイル構成
 
-- `index.html`
-- `app.js`
-- `styles.css`
-- `questions.json`
-- `vercel.json`
+```text
+.
+├── index.html
+├── styles.css
+├── app.js
+├── data/
+│   └── questions.js
+├── vercel.json
+├── .gitignore
+└── README.md
+```
 
-環境変数、API キー、データベースは不要です。
+ビルドツールやNode.js依存はありません。静的ファイルだけで動作します。
 
-## 注意
+## ローカルで確認
 
-このアプリは添付された問題集を学習素材として表示します。問題集自体に誤植・欠落・古い仕様が含まれる可能性があります。PDF 原文の欠落が確認できた問題については、その旨を画面上に表示しています。
+Pythonがある場合:
+
+```bash
+python -m http.server 8000
+```
+
+ブラウザで `http://localhost:8000` を開きます。
+
+## GitHubへアップロード
+
+新しいGitHubリポジトリを作成後、このフォルダー内で実行します。
+
+```bash
+git init
+git add .
+git commit -m "Initial Service Cloud Consultant study site"
+git branch -M main
+git remote add origin https://github.com/YOUR_NAME/YOUR_REPO.git
+git push -u origin main
+```
+
+## Vercelへデプロイ
+
+1. Vercelで **Add New > Project** を選択
+2. 上記GitHubリポジトリをImport
+3. Framework Presetは **Other** のままでOK
+4. Build Command / Output Directory は未設定でOK
+5. **Deploy**
+
+以後は `main` ブランチへpushするとVercelが自動再デプロイします。
+
+## 問題データを更新する場所
+
+`data/questions.js` の `window.QUESTIONS` 配列が問題データです。
+
+各問題は出典ごとに一意のIDを持っています。
+
+- 80問版: `JAN80-Q001` ～ `JAN80-Q080`
+- 116問版: `APR116-Q001` ～ `APR116-Q116`
+
+このため、同一内容の問題が両方のPDFに存在しても学習履歴が混ざりません。

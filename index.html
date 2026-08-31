@@ -1,61 +1,49 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#08111f" />
-  <title>Service Cloud Consultant Study Lab</title>
-  <meta name="description" content="Salesforce Service Cloud Consultant 資格学習用。一問一答・模擬試験・復習。精査済み日本語を静的収録し、外部翻訳APIは使用しません。" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Salesforce Service Cloud Consultant 過去問 196問 日本語学習サイト" />
+  <meta name="theme-color" content="#0176d3" />
+  <title>Service Cloud Consultant Cert Lab - 196問</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="bg-orb orb-a"></div><div class="bg-orb orb-b"></div>
   <div class="app-shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="brand">
-        <div class="brand-mark">☁</div>
-        <div><strong>Service Cloud</strong><span>Study Lab</span></div>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <button class="brand" type="button" data-nav="home" aria-label="ホームへ戻る">
+          <span class="brand-mark">SC</span>
+          <span><strong>Service Cloud</strong><small>Consultant Cert Lab</small></span>
+        </button>
+        <span class="count-badge">196問・日本語版</span>
+        <div class="top-spacer"></div>
+        <div id="topTimer" class="top-timer" aria-live="polite"></div>
       </div>
-      <nav class="nav" id="nav">
-        <button class="nav-item active" data-view="dashboard"><span>⌂</span>ダッシュボード</button>
-        <button class="nav-item" data-view="study"><span>✦</span>一問一答</button>
-        <button class="nav-item" data-view="mock"><span>◷</span>模擬試験</button>
-        <button class="nav-item" data-view="review"><span>↺</span>復習</button>
-        <button class="nav-item" data-view="library"><span>≡</span>問題一覧</button>
-      </nav>
-      <div class="sidebar-card">
-        <span class="eyebrow">TARGET</span>
-        <div class="target-row"><strong id="sideAccuracy">--%</strong><span>総合正答率</span></div>
-        <div class="mini-progress"><i id="sideProgress"></i></div>
-        <small id="sideSolved">0 / 196 問に挑戦</small>
-      </div>
-      <div class="sidebar-bottom">
-        <button class="ghost-btn" id="exportBtn">学習データを書き出す</button>
-        <label class="ghost-btn file-label">学習データを読み込む<input id="importInput" type="file" accept="application/json" hidden></label>
-      </div>
-    </aside>
+    </header>
 
-    <main class="main">
-      <header class="topbar">
-        <button class="menu-btn" id="menuBtn">☰</button>
-        <div>
-          <p class="eyebrow">SALESFORCE CERTIFICATION</p>
-          <h1 id="pageTitle">学習ダッシュボード</h1>
-        </div>
-        <div class="top-actions">
-          <div class="streak-pill">🔥 <b id="topStreak">0</b><span>連続正解</span></div>
-          <button class="icon-btn" id="themeBtn" title="テーマ切替">◐</button>
-        </div>
-      </header>
+    <div class="page-layout">
+      <aside class="sidebar" aria-label="メインメニュー">
+        <button class="nav-item active" data-nav="home">🏠 <span>ホーム</span></button>
+        <button class="nav-item" data-nav="practice">📚 <span>一問一答</span></button>
+        <button class="nav-item" data-nav="mock">📝 <span>60問模擬試験</span></button>
+        <button class="nav-item" data-nav="review">❌ <span>間違い復習</span></button>
+        <button class="nav-item" data-nav="analysis">📊 <span>学習分析</span></button>
+        <button class="nav-item" data-nav="bank">🧰 <span>問題バンク</span></button>
+      </aside>
 
-      <section id="view-dashboard" class="view active"></section>
-      <section id="view-study" class="view"></section>
-      <section id="view-mock" class="view"></section>
-      <section id="view-review" class="view"></section>
-      <section id="view-library" class="view"></section>
-    </main>
+      <main class="main-content">
+        <section id="home" class="view active"></section>
+        <section id="practice" class="view"></section>
+        <section id="mock" class="view"></section>
+        <section id="review" class="view"></section>
+        <section id="analysis" class="view"></section>
+        <section id="bank" class="view"></section>
+      </main>
+    </div>
   </div>
-  <div id="toast" class="toast"></div>
-  <script src="./app.js" defer></script>
+
+  <script src="./data/questions.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
