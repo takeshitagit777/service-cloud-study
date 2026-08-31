@@ -3,6 +3,33 @@
 
   const QUESTIONS = Array.isArray(window.QUESTIONS) ? window.QUESTIONS : [];
   const STORAGE_KEY = 'serviceCloudConsultant196Ja_v1';
+  const THEME_KEY = 'serviceCloudConsultantTheme';
+
+  function applyTheme(theme){
+    const value = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = value;
+    localStorage.setItem(THEME_KEY, value);
+    const btn = document.getElementById('themeToggle');
+    if(btn){
+      const dark = value === 'dark';
+      btn.setAttribute('aria-pressed', String(dark));
+      btn.setAttribute('aria-label', dark ? 'ライトモードに切り替え' : 'ダークモードに切り替え');
+      const icon = btn.querySelector('.theme-icon');
+      const label = btn.querySelector('.theme-label');
+      if(icon) icon.textContent = dark ? '☀️' : '🌙';
+      if(label) label.textContent = dark ? 'ライト' : 'ダーク';
+    }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', darkThemeColor(value));
+  }
+  function darkThemeColor(theme){ return theme === 'dark' ? '#0b1220' : '#0176d3'; }
+  function initThemeToggle(){
+    const current = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+    applyTheme(current);
+    document.getElementById('themeToggle')?.addEventListener('click', () => {
+      applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    });
+  }
   const CATEGORIES = [
     {id:'industry', label:'業界知識'},
     {id:'implementation', label:'実装戦略'},
@@ -204,6 +231,8 @@
 
   window.switchView = switchView;
   window.renderMockLanding = renderMockLanding;
+
+  initThemeToggle();
 
   if(QUESTIONS.length!==196){document.getElementById('home').innerHTML=`<div class="notice">問題データの読み込みに失敗しました（${QUESTIONS.length}/196問）。data/questions.js を確認してください。</div>`;}else{renderHome();}
 })();
