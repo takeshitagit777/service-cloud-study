@@ -1,16 +1,10 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Salesforce Service Cloud Consultant 過去問 196問 日本語学習サイト" />
-  <meta name="theme-color" content="#0176d3" />
-  <script>
-    (() => {
-      const saved = localStorage.getItem('serviceCloudConsultantTheme');
-      document.documentElement.dataset.theme = saved === 'dark' ? 'dark' : 'light';
-    })();
-  </script>
+  <meta name="theme-color" content="#0b1220" />
   <title>Service Cloud Consultant Cert Lab - 196問</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -25,10 +19,6 @@
         <span class="count-badge">196問・日本語版</span>
         <div class="top-spacer"></div>
         <div id="topTimer" class="top-timer" aria-live="polite"></div>
-        <button id="themeToggle" class="theme-toggle" type="button" aria-label="ダークモードに切り替え" aria-pressed="false">
-          <span class="theme-icon" aria-hidden="true">🌙</span>
-          <span class="theme-label">ダーク</span>
-        </button>
       </div>
     </header>
 
