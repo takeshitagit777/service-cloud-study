@@ -3,6 +3,11 @@
 
   const QUESTIONS = Array.isArray(window.QUESTIONS) ? window.QUESTIONS : [];
   const STORAGE_KEY = 'serviceCloudConsultant196Ja_v1';
+  const PASSING_SCORE = 78;
+  const MOCK_CONFIG = {
+    10: {size:10, duration:18*60, label:'10問ミニ模試', timeLabel:'18分'},
+    60: {size:60, duration:105*60, label:'60問本番模試', timeLabel:'105分'}
+  };
   const CATEGORIES = [
     {id:'industry', label:'業界知識'},
     {id:'implementation', label:'実装戦略'},
@@ -74,7 +79,7 @@
         <div class="hero-kicker">Salesforce Service Cloud Consultant</div>
         <h1>過去問 196問を日本語で学習</h1>
         <p>2026-01-08版の80問と、2026-04-28版の116問を両方そのまま収録しています。重複問題も削除せず、出典ごとに別問題として保持。学習履歴はこのブラウザに自動保存されます。</p>
-        <div class="hero-actions"><button class="btn primary" onclick="switchView('practice')">一問一答を始める</button><button class="btn" onclick="switchView('mock')">60問模試を受ける</button></div>
+        <div class="hero-actions"><button class="btn primary" onclick="switchView('practice')">一問一答を始める</button><button class="btn" onclick="switchView('mock')">模擬試験を受ける</button></div>
       </div>
       <div class="grid">
         <div class="card"><div class="muted small">回答済み</div><div class="stat">${s.attempted}<span class="muted" style="font-size:15px"> / 196</span></div><div class="progress"><div style="width:${pct(s.attempted,196)}%"></div></div></div>
@@ -152,14 +157,53 @@
     return `<div class="question-card"><div class="q-head"><div class="q-meta"><span class="q-number">${esc(q.id)}</span>${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span><span class="tag">${esc(q.concept)}</span></div><button class="heart ${fav?'on':''}" onclick="toggleFavorite('${q.id}','${mode}')" aria-label="お気に入り">${fav?'♥':'♡'}</button></div><div class="q-text">${esc(q.question)}</div><div class="choices">${choices}</div>${result}<div class="quiz-footer"><button class="btn" onclick="nextPractice(-1)" ${practice.index===0?'disabled':''}>← 前へ</button><div class="spacer"></div><button class="btn primary" onclick="nextPractice(1)" ${practice.index===practice.list.length-1?'disabled':''}>次へ →</button></div></div>`;
   }
 
+  function requiredCorrect(total){ return Math.ceil(total * PASSING_SCORE / 100); }
+  function mockPass(rate){ return rate >= PASSING_SCORE; }
+
   function renderMockLanding(){
-    document.getElementById('mock').innerHTML=`<div class="hero"><div class="hero-kicker">Mock Exam</div><h1>60問 模擬試験</h1><p>196問から60問をランダム出題します。出典を片方に絞ることもできます。制限時間は105分。終了後に正答率と分野別結果を確認できます。</p></div><div class="section-title"><h2>模試設定</h2></div><div class="card"><div class="toolbar">${sourceSelect('all')}<button class="btn primary" onclick="startMockFromUi()">模試を開始</button></div><div class="muted small">※同一内容の問題が2つのPDFに収録されている場合も、別問題として抽選対象になります。</div></div>${state.mockHistory.length?mockHistoryHtml():''}`;
+    document.getElementById('mock').innerHTML=`
+      <div class="hero">
+        <div class="hero-kicker">Mock Exam</div>
+        <h1>模擬試験</h1>
+        <p>196問からランダム出題。10問の短時間チェックと、60問の本番想定模試を選べます。合格ラインは ${PASSING_SCORE}% です。</p>
+      </div>
+      <div class="section-title"><h2>模試を選ぶ</h2><span class="muted small">合格ライン ${PASSING_SCORE}%</span></div>
+      <div class="grid two mock-mode-grid">
+        <div class="card mock-mode-card">
+          <div class="muted small">QUICK MOCK</div>
+          <div class="mock-mode-number">10問</div>
+          <h3>10問ミニ模試</h3>
+          <p class="muted">短時間で実力チェック。制限時間18分。本番105分を問題数に比例させた練習用時間です。</p>
+          <div class="pass-line">合格目安 <strong>8 / 10問以上</strong>（${PASSING_SCORE}%基準）</div>
+          <button class="btn primary" onclick="selectMockSize(10)">10問模試を開始</button>
+        </div>
+        <div class="card mock-mode-card">
+          <div class="muted small">FULL MOCK</div>
+          <div class="mock-mode-number">60問</div>
+          <h3>60問本番模試</h3>
+          <p class="muted">本番想定の60問。制限時間105分。終了時に合否・正答率・分野別結果を表示します。</p>
+          <div class="pass-line">合格目安 <strong>47 / 60問以上</strong>（${PASSING_SCORE}%基準）</div>
+          <button class="btn primary" onclick="selectMockSize(60)">60問模試を開始</button>
+        </div>
+      </div>
+      <div id="mockSettings"></div>
+      <div class="notice" style="margin-top:16px">合格判定は ${PASSING_SCORE}% を基準にしています。10問模試は問題数が少ないため、整数換算で8問以上を合格と判定します。</div>
+      ${state.mockHistory.length?mockHistoryHtml():''}`;
   }
-  function mockHistoryHtml(){return `<div class="section-title"><h2>最近の模試</h2></div><div class="card table-wrap"><table class="table"><thead><tr><th>日時</th><th>出典</th><th>正答</th><th>正答率</th></tr></thead><tbody>${state.mockHistory.slice(0,8).map(h=>`<tr><td>${new Date(h.at).toLocaleString('ja-JP')}</td><td>${esc(h.sourceLabel)}</td><td>${h.correct}/${h.total}</td><td>${h.rate}%</td></tr>`).join('')}</tbody></table></div>`;}
-  window.startMockFromUi=function(){ startMock(document.getElementById('sourceFilter').value); };
-  function startMock(source='all'){
-    const pool=sourceFilter(source);const size=Math.min(60,pool.length);
-    mock={questions:shuffle(pool).slice(0,size),index:0,answers:{},flagged:{},startedAt:Date.now(),duration:105*60,source};
+
+  window.selectMockSize=function(size){
+    const cfg=MOCK_CONFIG[size]; if(!cfg)return;
+    document.getElementById('mockSettings').innerHTML=`<div class="section-title"><h2>${cfg.label} 設定</h2></div><div class="card"><div class="toolbar">${sourceSelect('all')}<button class="btn primary" onclick="startMockFromUi(${size})">${size}問模試を開始</button></div><div class="muted small">※同一内容の問題が2つのPDFに収録されている場合も、別問題として抽選対象になります。</div></div>`;
+    document.getElementById('mockSettings').scrollIntoView({behavior:'smooth',block:'start'});
+  };
+
+  function mockHistoryHtml(){return `<div class="section-title"><h2>最近の模試</h2></div><div class="card table-wrap"><table class="table"><thead><tr><th>日時</th><th>形式</th><th>出典</th><th>正答</th><th>正答率</th><th>判定</th></tr></thead><tbody>${state.mockHistory.slice(0,8).map(h=>{const passed=(h.pass!==undefined?h.pass:mockPass(h.rate));return `<tr><td>${new Date(h.at).toLocaleString('ja-JP')}</td><td>${h.total}問</td><td>${esc(h.sourceLabel)}</td><td>${h.correct}/${h.total}</td><td>${h.rate}%</td><td><strong class="${passed?'good-text':'bad-text'}">${passed?'合格':'不合格'}</strong></td></tr>`}).join('')}</tbody></table></div>`;}
+
+  window.startMockFromUi=function(size){ startMock(document.getElementById('sourceFilter').value, size); };
+  function startMock(source='all', requestedSize=60){
+    const cfg=MOCK_CONFIG[requestedSize] || MOCK_CONFIG[60];
+    const pool=sourceFilter(source); const size=Math.min(cfg.size,pool.length);
+    mock={questions:shuffle(pool).slice(0,size),index:0,answers:{},flagged:{},startedAt:Date.now(),duration:cfg.duration,source,requestedSize:cfg.size,label:cfg.label};
     renderMock();startMockTimer();
   }
   function startMockTimer(){clearMockTimer();updateTimer();mockTimer=setInterval(updateTimer,1000);}
@@ -167,18 +211,24 @@
   function updateTimer(){if(!mock)return;const left=Math.max(0,mock.duration-Math.floor((Date.now()-mock.startedAt)/1000));const mm=String(Math.floor(left/60)).padStart(2,'0'),ss=String(left%60).padStart(2,'0');document.getElementById('topTimer').textContent=`残り ${mm}:${ss}`;if(left<=0)finishMock();}
   function renderMock(){
     const root=document.getElementById('mock'),q=mock.questions[mock.index],selected=mock.answers[q.id];
-    root.innerHTML=`<div class="mock-layout"><div class="question-card"><div class="q-head"><div class="q-meta"><span class="q-number">${mock.index+1} / ${mock.questions.length}</span>${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span></div><button class="heart ${mock.flagged[q.id]?'on':''}" onclick="toggleMockFlag('${q.id}')">⚑</button></div><div class="q-text">${esc(q.question)}</div><div class="choices">${q.choices.map((c,i)=>`<button class="choice ${selected===i?'selected':''}" onclick="answerMock(${i})"><span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(c)}</span></button>`).join('')}</div><div class="quiz-footer"><button class="btn" onclick="goMock(-1)" ${mock.index===0?'disabled':''}>← 前へ</button><div class="spacer"></div><button class="btn" onclick="goMock(1)" ${mock.index===mock.questions.length-1?'disabled':''}>次へ →</button><button class="btn primary" onclick="confirmFinishMock()">採点する</button></div></div><aside class="card mock-side"><strong>問題一覧</strong><div class="q-grid" style="margin-top:10px">${mock.questions.map((x,i)=>`<button class="${mock.answers[x.id]!==undefined?'answered':''} ${i===mock.index?'current':''} ${mock.flagged[x.id]?'flagged':''}" onclick="jumpMock(${i})">${i+1}</button>`).join('')}</div><div class="mock-summary"><div class="mock-summary-row"><span class="muted">回答済み</span><strong>${Object.keys(mock.answers).length}/${mock.questions.length}</strong></div><div class="mock-summary-row"><span class="muted">見直し</span><strong>${Object.keys(mock.flagged).length}</strong></div></div></aside></div>`;
+    root.innerHTML=`<div class="mock-layout"><div class="question-card"><div class="q-head"><div class="q-meta"><span class="q-number">${mock.index+1} / ${mock.questions.length}</span><span class="tag">${esc(mock.label)}</span>${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span></div><button class="heart ${mock.flagged[q.id]?'on':''}" onclick="toggleMockFlag('${q.id}')">⚑</button></div><div class="q-text">${esc(q.question)}</div><div class="choices">${q.choices.map((c,i)=>`<button class="choice ${selected===i?'selected':''}" onclick="answerMock(${i})"><span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(c)}</span></button>`).join('')}</div><div class="quiz-footer"><button class="btn" onclick="goMock(-1)" ${mock.index===0?'disabled':''}>← 前へ</button><div class="spacer"></div><button class="btn" onclick="goMock(1)" ${mock.index===mock.questions.length-1?'disabled':''}>次へ →</button><button class="btn primary" onclick="confirmFinishMock()">採点する</button></div></div><aside class="card mock-side"><strong>問題一覧</strong><div class="q-grid" style="margin-top:10px">${mock.questions.map((x,i)=>`<button class="${mock.answers[x.id]!==undefined?'answered':''} ${i===mock.index?'current':''} ${mock.flagged[x.id]?'flagged':''}" onclick="jumpMock(${i})">${i+1}</button>`).join('')}</div><div class="mock-summary"><div class="mock-summary-row"><span class="muted">合格ライン</span><strong>${requiredCorrect(mock.questions.length)}/${mock.questions.length}</strong></div><div class="mock-summary-row"><span class="muted">回答済み</span><strong>${Object.keys(mock.answers).length}/${mock.questions.length}</strong></div><div class="mock-summary-row"><span class="muted">見直し</span><strong>${Object.keys(mock.flagged).length}</strong></div></div></aside></div>`;
   }
   window.answerMock=function(i){mock.answers[mock.questions[mock.index].id]=i;renderMock();};
   window.goMock=function(d){const i=mock.index+d;if(i>=0&&i<mock.questions.length){mock.index=i;renderMock();window.scrollTo({top:0,behavior:'smooth'});}};
   window.jumpMock=function(i){mock.index=i;renderMock();window.scrollTo({top:0,behavior:'smooth'});};
   window.toggleMockFlag=function(id){mock.flagged[id]=!mock.flagged[id];if(!mock.flagged[id])delete mock.flagged[id];renderMock();};
   window.confirmFinishMock=function(){const remain=mock.questions.length-Object.keys(mock.answers).length;if(remain&&!confirm(`未回答が${remain}問あります。採点しますか？`))return;finishMock();};
-  function finishMock(){if(!mock)return;clearMockTimer();let correct=0;mock.questions.forEach(q=>{const choice=mock.answers[q.id];if(choice===q.answer)correct++;if(choice!==undefined){state.answers[q.id]={choice,correct:choice===q.answer,at:Date.now()};}});const rate=pct(correct,mock.questions.length);state.mockHistory.unshift({at:Date.now(),source:mock.source,sourceLabel:mock.source==='all'?'全196問':SOURCE_LABELS[mock.source],correct,total:mock.questions.length,rate});state.mockHistory=state.mockHistory.slice(0,20);saveState();renderMockResult(correct,rate);}
-  function renderMockResult(correct,rate){
-    const qs=mock.questions;document.getElementById('topTimer').textContent='';
+  function finishMock(){
+    if(!mock)return; clearMockTimer(); let correct=0;
+    mock.questions.forEach(q=>{const choice=mock.answers[q.id];if(choice===q.answer)correct++;if(choice!==undefined){state.answers[q.id]={choice,correct:choice===q.answer,at:Date.now()};}});
+    const rate=pct(correct,mock.questions.length), pass=mockPass(rate);
+    state.mockHistory.unshift({at:Date.now(),source:mock.source,sourceLabel:mock.source==='all'?'全196問':SOURCE_LABELS[mock.source],correct,total:mock.questions.length,rate,pass,passingScore:PASSING_SCORE});
+    state.mockHistory=state.mockHistory.slice(0,20); saveState(); renderMockResult(correct,rate,pass);
+  }
+  function renderMockResult(correct,rate,pass){
+    const qs=mock.questions; const needed=requiredCorrect(qs.length); document.getElementById('topTimer').textContent='';
     const catRows=CATEGORIES.map(c=>{const list=qs.filter(q=>q.category===c.id);if(!list.length)return'';const ok=list.filter(q=>mock.answers[q.id]===q.answer).length;return `<tr><td>${esc(c.label)}</td><td>${ok}/${list.length}</td><td>${pct(ok,list.length)}%</td></tr>`;}).join('');
-    document.getElementById('mock').innerHTML=`<div class="card result-hero"><div class="muted">模擬試験結果</div><div class="score ${rate>=65?'good-text':'bad-text'}">${rate}%</div><div><strong>${correct} / ${qs.length} 問正解</strong></div><div style="margin-top:16px"><button class="btn primary" onclick="renderMockLanding()">もう一度受ける</button></div></div><div class="grid two"><div class="card table-wrap"><h3>分野別</h3><table class="table"><thead><tr><th>分野</th><th>正解</th><th>正答率</th></tr></thead><tbody>${catRows}</tbody></table></div><div class="card"><h3>復習ポイント</h3><p class="muted">不正解だった問題は「間違い復習」に自動追加されます。一問一答の回答履歴にも反映されています。</p><button class="btn" onclick="switchView('review')">間違いを復習する</button></div></div>`;mock=null;
+    document.getElementById('mock').innerHTML=`<div class="card result-hero"><div class="result-status ${pass?'pass':'fail'}">${pass?'合格':'不合格'}</div><div class="muted">${qs.length}問 模擬試験結果</div><div class="score ${pass?'good-text':'bad-text'}">${rate}%</div><div><strong>${correct} / ${qs.length} 問正解</strong></div><div class="pass-line result-pass-line">合格ライン ${PASSING_SCORE}% ／ ${needed}問以上正解</div><div style="margin-top:16px"><button class="btn primary" onclick="renderMockLanding()">別の模試を受ける</button></div></div><div class="grid two"><div class="card table-wrap"><h3>分野別</h3><table class="table"><thead><tr><th>分野</th><th>正解</th><th>正答率</th></tr></thead><tbody>${catRows}</tbody></table></div><div class="card"><h3>復習ポイント</h3><p class="muted">不正解だった問題は「間違い復習」に自動追加されます。一問一答の回答履歴にも反映されています。</p><button class="btn" onclick="switchView('review')">間違いを復習する</button></div></div>`; mock=null;
   }
 
   function renderReview(){
