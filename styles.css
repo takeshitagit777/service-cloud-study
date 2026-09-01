@@ -87,3 +87,36 @@ button{color:inherit}
   .page-layout{grid-template-columns:1fr;padding:0 12px;margin-top:12px}.sidebar{position:static;display:flex;overflow-x:auto;padding:7px}.nav-item{white-space:nowrap;width:auto}.grid,.grid.two,.source-grid{grid-template-columns:1fr}.mock-layout{grid-template-columns:1fr}.mock-side{position:static;order:-1}.q-grid{grid-template-columns:repeat(10,1fr)}.hero{padding:22px}.hero h1{font-size:25px}.topbar-inner{padding:10px 12px}.count-badge{display:none}.category-row{grid-template-columns:1fr 1.2fr 55px}.toolbar input{min-width:0;width:100%}
 }
 @media(max-width:520px){.brand small{display:none}.q-grid{grid-template-columns:repeat(6,1fr)}.question-card{padding:16px}.q-text{font-size:17px}.hero h1{font-size:23px}.category-row{grid-template-columns:1fr}.category-row>strong{text-align:left!important}.quiz-footer{flex-wrap:wrap}}
+
+
+/* Choice-by-choice explanations */
+.explain-label{font-size:12px;font-weight:900;letter-spacing:.04em;color:var(--muted);margin:7px 0 2px}
+.choice-explanations{margin-top:15px;display:grid;gap:10px}
+.choice-explanations-title{font-size:14px;font-weight:950;color:var(--text);margin-bottom:1px}
+.option-explanation{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:#101a2a}
+.option-explanation.correct-option{border-color:#315e3e;background:var(--good-soft)}
+.option-explanation.selected-wrong-option{border-color:#7c303a;background:var(--bad-soft)}
+.option-explanation-head{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;line-height:1.5}
+.option-letter{flex:0 0 26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#26344a;font-weight:950}
+.option-status,.your-answer{font-size:11px;font-weight:900;padding:3px 7px;border-radius:999px}
+.option-status.ok{background:#173d25;color:#8be3a6}
+.option-status.ng{background:#35202a;color:#ff9ca8}
+.your-answer{background:#243b57;color:#9fd4ff}
+.option-reason{margin-top:8px;line-height:1.75;color:#d8e3f2;font-size:14px}
+.review-warning{margin-top:13px;padding:13px 14px;border-radius:12px;border:1px solid #8d6828;background:#2c2412;color:#f8d98c;line-height:1.7}
+.review-warning strong{display:block;margin-bottom:4px}
+.mock-review-list{display:grid;gap:10px}
+.mock-review-item{border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}
+.mock-review-item summary{cursor:pointer;display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:10px;align-items:center;padding:14px 16px;font-weight:800}
+.mock-review-item summary:hover{background:#111c2d}
+.mock-review-body{border-top:1px solid var(--line);padding:17px}
+.review-index{color:var(--brand);font-weight:950}
+.review-question-short{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#dce7f5}
+.review-q-text{margin-top:12px}
+.answer-summary{margin:12px 0;padding:11px 13px;border-radius:10px;background:#0e1726;line-height:1.7}
+.explanation-policy{line-height:1.75}
+@media(max-width:720px){
+  .mock-review-item summary{grid-template-columns:auto auto;gap:7px}
+  .review-question-short{grid-column:1/-1;white-space:normal;font-size:13px}
+  .option-explanation-head strong{flex:1 1 calc(100% - 40px)}
+}

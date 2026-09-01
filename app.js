@@ -50,6 +50,52 @@
   }
   function wrongQuestions(){ return QUESTIONS.filter(q=>state.answers[q.id] && !state.answers[q.id].correct); }
 
+  function reviewNoteHtml(q){
+    if(!q.reviewNote) return '';
+    return `<div class="review-warning"><strong>⚠️ 公式仕様との整合性メモ</strong><div>${esc(q.reviewNote)}</div></div>`;
+  }
+
+  function choiceExplanationsHtml(q, selected){
+    if(!Array.isArray(q.choiceExplanations)) return '';
+    const rows=q.choices.map((choice,i)=>{
+      const isCorrect=i===q.answer;
+      const isSelected=selected===i;
+      const status=isCorrect?'正解':'不正解';
+      const cls=isCorrect?'correct-option':(isSelected?'selected-wrong-option':'wrong-option');
+      const selectedBadge=isSelected?`<span class="your-answer">${isCorrect?'あなたの回答':'あなたの回答'}</span>`:'';
+      return `<div class="option-explanation ${cls}">
+        <div class="option-explanation-head">
+          <span class="option-letter">${String.fromCharCode(65+i)}</span>
+          <strong>${esc(choice)}</strong>
+          <span class="option-status ${isCorrect?'ok':'ng'}">${status}</span>
+          ${selectedBadge}
+        </div>
+        <div class="option-reason">${esc(q.choiceExplanations[i]||'')}</div>
+      </div>`;
+    }).join('');
+    return `<div class="choice-explanations"><div class="choice-explanations-title">選択肢ごとの解説</div>${rows}</div>${reviewNoteHtml(q)}`;
+  }
+
+  function mockQuestionReviewHtml(q, index){
+    const selected=mock.answers[q.id];
+    const correct=selected===q.answer;
+    const answerText=selected===undefined?'未回答':`${String.fromCharCode(65+selected)}. ${esc(q.choices[selected])}`;
+    return `<details class="mock-review-item" ${!correct?'open':''}>
+      <summary>
+        <span class="review-index">Q${index+1}</span>
+        <span class="${correct?'good-text':'bad-text'}">${correct?'正解':'不正解'}</span>
+        <span class="review-question-short">${esc(q.question)}</span>
+      </summary>
+      <div class="mock-review-body">
+        <div class="q-meta">${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span><span class="tag">${esc(q.concept)}</span></div>
+        <div class="q-text review-q-text">${esc(q.question)}</div>
+        <div class="answer-summary"><strong>あなたの回答：</strong>${answerText}<br><strong>正解：</strong>${String.fromCharCode(65+q.answer)}. ${esc(q.choices[q.answer])}</div>
+        <div class="explain"><strong>全体解説</strong>${esc(q.explanation)}</div>
+        ${choiceExplanationsHtml(q,selected)}
+      </div>
+    </details>`;
+  }
+
   document.addEventListener('click', e => {
     const nav = e.target.closest('[data-nav]');
     if(nav){ switchView(nav.dataset.nav); }
@@ -95,6 +141,7 @@
       <div class="card">${CATEGORIES.map(c=>{const list=QUESTIONS.filter(q=>q.category===c.id);const x=statsFor(list);return `<div class="category-row"><div><strong>${esc(c.label)}</strong><div class="muted small">${x.attempted}/${list.length}問回答</div></div><div><div class="progress"><div style="width:${x.rate}%"></div></div></div><strong style="text-align:right">${x.rate}%</strong></div>`;}).join('')}</div>
       <div class="section-title"><h2>データ管理</h2></div>
       <div class="card"><div class="actions" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn danger" onclick="resetProgress()">学習履歴をリセット</button></div><div class="muted small" style="margin-top:9px">履歴はlocalStorageに保存され、GitHub/Vercel側へ送信されません。</div></div>
+      <div class="notice explanation-policy" style="margin-top:16px"><strong>選択肢別解説を収録</strong><br>回答後に、正解だけでなく全選択肢について「なぜ正しいか／なぜ違うか」を表示します。元PDFの基本解説を基準に、Salesforce機能の用途・制約を補足しています。現行公式仕様との整合性に注意が必要な設問は警告表示します。</div>
       <div class="footer-note">Service Cloud Consultant 自習用・日本語学習サイト</div>`;
   }
 
@@ -153,7 +200,7 @@
       const handler=mode==='practice'?`answerPractice(${i})`:'';
       return `<button class="${cls}" ${answered||mode!=='practice'?'disabled':''} ${handler?`onclick="${handler}"`:''}><span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(c)}</span></button>`;
     }).join('');
-    const result=answered?`<div class="explain"><strong class="${selected===q.answer?'good-text':'bad-text'}">${selected===q.answer?'正解！':'不正解'}　正解：${String.fromCharCode(65+q.answer)}. ${esc(q.choices[q.answer])}</strong>${esc(q.explanation)}</div>`:'';
+    const result=answered?`<div class="explain"><strong class="${selected===q.answer?'good-text':'bad-text'}">${selected===q.answer?'正解！':'不正解'}　正解：${String.fromCharCode(65+q.answer)}. ${esc(q.choices[q.answer])}</strong><div class="explain-label">全体解説</div>${esc(q.explanation)}</div>${choiceExplanationsHtml(q,selected)}`:'';
     return `<div class="question-card"><div class="q-head"><div class="q-meta"><span class="q-number">${esc(q.id)}</span>${sourceTag(q)}<span class="tag">${esc(catLabel(q.category))}</span><span class="tag">${esc(q.concept)}</span></div><button class="heart ${fav?'on':''}" onclick="toggleFavorite('${q.id}','${mode}')" aria-label="お気に入り">${fav?'♥':'♡'}</button></div><div class="q-text">${esc(q.question)}</div><div class="choices">${choices}</div>${result}<div class="quiz-footer"><button class="btn" onclick="nextPractice(-1)" ${practice.index===0?'disabled':''}>← 前へ</button><div class="spacer"></div><button class="btn primary" onclick="nextPractice(1)" ${practice.index===practice.list.length-1?'disabled':''}>次へ →</button></div></div>`;
   }
 
@@ -228,7 +275,8 @@
   function renderMockResult(correct,rate,pass){
     const qs=mock.questions; const needed=requiredCorrect(qs.length); document.getElementById('topTimer').textContent='';
     const catRows=CATEGORIES.map(c=>{const list=qs.filter(q=>q.category===c.id);if(!list.length)return'';const ok=list.filter(q=>mock.answers[q.id]===q.answer).length;return `<tr><td>${esc(c.label)}</td><td>${ok}/${list.length}</td><td>${pct(ok,list.length)}%</td></tr>`;}).join('');
-    document.getElementById('mock').innerHTML=`<div class="card result-hero"><div class="result-status ${pass?'pass':'fail'}">${pass?'合格':'不合格'}</div><div class="muted">${qs.length}問 模擬試験結果</div><div class="score ${pass?'good-text':'bad-text'}">${rate}%</div><div><strong>${correct} / ${qs.length} 問正解</strong></div><div class="pass-line result-pass-line">合格ライン ${PASSING_SCORE}% ／ ${needed}問以上正解</div><div style="margin-top:16px"><button class="btn primary" onclick="renderMockLanding()">別の模試を受ける</button></div></div><div class="grid two"><div class="card table-wrap"><h3>分野別</h3><table class="table"><thead><tr><th>分野</th><th>正解</th><th>正答率</th></tr></thead><tbody>${catRows}</tbody></table></div><div class="card"><h3>復習ポイント</h3><p class="muted">不正解だった問題は「間違い復習」に自動追加されます。一問一答の回答履歴にも反映されています。</p><button class="btn" onclick="switchView('review')">間違いを復習する</button></div></div>`; mock=null;
+    const reviewRows=qs.map((q,i)=>mockQuestionReviewHtml(q,i)).join('');
+    document.getElementById('mock').innerHTML=`<div class="card result-hero"><div class="result-status ${pass?'pass':'fail'}">${pass?'合格':'不合格'}</div><div class="muted">${qs.length}問 模擬試験結果</div><div class="score ${pass?'good-text':'bad-text'}">${rate}%</div><div><strong>${correct} / ${qs.length} 問正解</strong></div><div class="pass-line result-pass-line">合格ライン ${PASSING_SCORE}% ／ ${needed}問以上正解</div><div style="margin-top:16px"><button class="btn primary" onclick="renderMockLanding()">別の模試を受ける</button></div></div><div class="grid two"><div class="card table-wrap"><h3>分野別</h3><table class="table"><thead><tr><th>分野</th><th>正解</th><th>正答率</th></tr></thead><tbody>${catRows}</tbody></table></div><div class="card"><h3>復習ポイント</h3><p class="muted">不正解だった問題は「間違い復習」に自動追加されます。下の「問題別解説」では、正解だけでなく全選択肢について、なぜ正しい／なぜ違うのかを確認できます。</p><button class="btn" onclick="switchView('review')">間違いを復習する</button></div></div><div class="section-title"><h2>問題別解説</h2><span class="muted small">各問題を開くと全選択肢の理由を確認できます</span></div><div class="mock-review-list">${reviewRows}</div><div class="notice explanation-policy"><strong>解説について</strong><br>元PDFに収録された正答・基本解説を学習データの基準とし、各不正解選択肢の理由はSalesforce各機能の用途・制約を踏まえて補足しています。現行の公式仕様と整合性に注意が必要な問題には警告を表示します。</div>`; mock=null;
   }
 
   function renderReview(){
