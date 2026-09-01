@@ -120,3 +120,20 @@ button{color:inherit}
   .review-question-short{grid-column:1/-1;white-space:normal;font-size:13px}
   .option-explanation-head strong{flex:1 1 calc(100% - 40px)}
 }
+
+/* 342-question edition */
+html[data-theme="dark"] .source-tag.apr{background:#15324f;color:#9cd0ff}
+html[data-theme="dark"] .source-tag.may{background:#17372d;color:#9ee7c1}
+html[data-theme="dark"] .source-tag.extra{background:#432a18;color:#ffd1a3}
+.source-tag.may{background:#eaf8f0;color:#257048}.source-tag.extra{background:#fff2e8;color:#9a4d12}
+.source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.multi-hint{margin-top:14px;padding:10px 12px;border-radius:10px;background:#182a42;border:1px solid #304c70;color:#b9d9ff;font-size:13px;line-height:1.6}
+.multi-tag{background:#302651!important;color:#d4c6ff!important}
+.choice.selected .letter{background:#214d78;color:#cfe9ff}
+.choice:disabled{cursor:default;opacity:1}
+
+/* Glossary */
+.glossary-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:24px}.glossary-hero h2{font-size:26px;margin:5px 0 8px}.glossary-hero p{margin:0;line-height:1.75;max-width:760px}.glossary-count{flex:0 0 105px;height:105px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(145deg,#153a62,#142846);border:1px solid #315679}.glossary-count strong{font-size:32px}.glossary-count span{font-size:12px;color:var(--muted)}
+.glossary-toolbar{margin-top:16px}.glossary-result-head{display:flex;justify-content:space-between;gap:10px;margin:8px 0 12px}.glossary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.glossary-card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:17px;display:flex;flex-direction:column;min-height:275px}.glossary-card-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.glossary-category,.related-count{font-size:11px;font-weight:850;border-radius:999px;padding:4px 8px}.glossary-category{background:#1b304b;color:#a8d3ff}.related-count{background:#1e2b3e;color:#b7c4d7}.glossary-card h3{font-size:19px;margin:12px 0 2px}.glossary-en{font-size:12px;color:#8fb8df;min-height:18px}.glossary-card p{line-height:1.7;color:#d5dfed;margin:12px 0}.exam-tip{margin-top:auto;border-left:3px solid var(--brand);background:#0e1726;padding:11px 12px;border-radius:8px;line-height:1.65;font-size:13px;color:#cfdcec}.exam-tip strong{display:block;color:#8dc7ff;margin-bottom:3px}.glossary-practice{margin-top:12px;width:100%}
+@media(max-width:860px){.glossary-grid{grid-template-columns:1fr}.glossary-hero{align-items:flex-start}.source-grid{grid-template-columns:1fr}}
+@media(max-width:520px){.glossary-count{display:none}.glossary-hero{padding:18px}.glossary-hero h2{font-size:22px}}

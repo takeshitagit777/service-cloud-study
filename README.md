@@ -1,27 +1,50 @@
-# Service Cloud Consultant Cert Lab - 196問 日本語版
+# Service Cloud Consultant Cert Lab - 342問 日本語版
 
-Salesforce Service Cloud Consultant の学習用静的Webサイトです。
+Salesforce Service Cloud Consultant の学習用静的Webサイトです。GitHubへpushし、Vercelでそのまま静的デプロイできます。
 
-## 収録内容
+## 収録問題
 
-- `2026-01-08版`: 80問
-- `2026-04-28版`: 116問
-- 合計: **196問**
-- 2つの版で重複する問題も削除せず、出典ごとに別問題として収録
-- 問題文・選択肢・解説は日本語化
-- Salesforce / Agentforce / Apex / REST API / Slack など、固有の製品名・技術名は必要に応じて原表記を保持
+| 出典 | 問題数 | ID |
+|---|---:|---|
+| 2026-01-08版 | 80問 | `JAN80-Q001` ～ `JAN80-Q080` |
+| 2026-04-28版 | 116問 | `APR116-Q001` ～ `APR116-Q116` |
+| 2024-05-23版 | 117問 | `MAY24-Q001` ～ `MAY24-Q117` |
+| 追加問題集 | 29問 | `EXTRA29-Q001` ～ `EXTRA29-Q029` |
+| **合計** | **342問** | |
+
+同じ内容の問題が別PDFに含まれる場合も、勝手に削除せず出典別の問題として保持しています。
+
+## 日本語化方針
+
+- 問題文・選択肢・全体解説を日本語化
+- 各選択肢に「なぜ正しい / なぜ違う」の解説を収録
+- 日本語のSalesforce公式・一般用語があるものは日本語を優先
+- Salesforce / Agentforce / Apex / Slack などの製品・技術固有名は必要に応じて原表記を保持
+- 古い問題に出る `Live Agent`、`Customer Community`、`Process Builder` などは、出題当時の意味を残しつつ現行名称・旧機能であることを補足
+- 元問題の正答と現行仕様の整合性に注意が必要な設問には警告メモを表示
 
 ## 主な機能
 
-- 一問一答
-- 2026-01-08版 / 2026-04-28版で絞り込み
-- 未回答・間違い・お気に入り・分野別フィルター
-- 10問ミニ模擬試験（18分）
-- 60問ランダム模擬試験（105分）
-- 合格ライン78%で自動判定（10問=8問以上、60問=47問以上）
+- 342問の一問一答
+- **単一選択 / 複数選択（2つ選択・3つ選択）対応**
+- 未回答・間違い・お気に入り・分野別・出典別フィルター
+- 10問ミニ模試（18分）
+- 60問本番模試（105分）
+- 合格ライン78%で自動判定
+  - 10問: 8問以上
+  - 60問: 47問以上
+- 模試中は正解を隠し、採点後に全選択肢の解説を表示
 - 間違い復習
 - 分野別・出典別の学習分析
-- 196問の問題バンク検索
+- 342問の問題バンク検索
+- **Service Cloud単語集 89語**
+  - 日本語名 / 英語名
+  - 機能の意味
+  - 試験での見分け方
+  - カテゴリ検索
+  - キーワード検索
+  - 関連問題件数
+  - 単語から関連問題だけを出題
 - 学習履歴をブラウザの `localStorage` に保存
 - UIはダークモード固定
 
@@ -33,80 +56,92 @@ Salesforce Service Cloud Consultant の学習用静的Webサイトです。
 ├── styles.css
 ├── app.js
 ├── data/
-│   └── questions.js
+│   ├── questions.js   # 342問
+│   └── glossary.js    # Service Cloud単語集
 ├── vercel.json
 ├── .gitignore
 └── README.md
 ```
 
-ビルドツールやNode.js依存はありません。静的ファイルだけで動作します。
+ビルドツールやNode.jsランタイムは不要です。通常の静的ファイルとして動作します。
 
-## ローカルで確認
-
-Pythonがある場合:
+## ローカル確認
 
 ```bash
 python -m http.server 8000
 ```
 
-ブラウザで `http://localhost:8000` を開きます。
+`http://localhost:8000` をブラウザで開きます。
 
 ## GitHubへアップロード
-
-新しいGitHubリポジトリを作成後、このフォルダー内で実行します。
 
 ```bash
 git init
 git add .
-git commit -m "Initial Service Cloud Consultant study site"
+git commit -m "Add Service Cloud Consultant 342-question study app"
 git branch -M main
 git remote add origin https://github.com/YOUR_NAME/YOUR_REPO.git
 git push -u origin main
 ```
 
+既存リポジトリへ上書きする場合は、このフォルダーの中身で既存ファイルを置き換えてから `git add / commit / push` してください。
+
 ## Vercelへデプロイ
 
-1. Vercelで **Add New > Project** を選択
-2. 上記GitHubリポジトリをImport
-3. Framework Presetは **Other** のままでOK
-4. Build Command / Output Directory は未設定でOK
-5. **Deploy**
+1. Vercelで **Add New > Project**
+2. GitHubリポジトリをImport
+3. Framework Preset: **Other**
+4. Build Command: 未設定
+5. Output Directory: 未設定
+6. Deploy
 
 以後は `main` ブランチへpushするとVercelが自動再デプロイします。
 
-## 問題データを更新する場所
+## 学習履歴
 
-`data/questions.js` の `window.QUESTIONS` 配列が問題データです。
+保存キーは `serviceCloudConsultant342Ja_v1` です。
 
-各問題は出典ごとに一意のIDを持っています。
+旧196問版の `serviceCloudConsultant196Ja_v1` がブラウザに残っている場合、新342問版を初めて開いた際に旧196問分の学習履歴を自動移行します。追加146問は未回答として開始します。
 
-- 80問版: `JAN80-Q001` ～ `JAN80-Q080`
-- 116問版: `APR116-Q001` ～ `APR116-Q116`
+## 問題データの更新
 
-このため、同一内容の問題が両方のPDFに存在しても学習履歴が混ざりません。
+`data/questions.js` の `window.QUESTIONS` が問題データです。
 
+主なフィールド:
 
-## テーマ
-UIはダークモード固定です。ライトモード切り替えはありません。
+```js
+{
+  id,
+  source,
+  sourceLabel,
+  sourceQuestion,
+  category,
+  concept,
+  question,
+  choices,
+  answers,          // 正答インデックス配列。複数選択対応
+  multiple,
+  selectCount,
+  explanation,
+  choiceExplanations,
+  reviewNote        // 必要な問題のみ
+}
+```
 
+## 単語集の更新
 
-## 模擬試験の合格ライン
+`data/glossary.js` の `window.GLOSSARY` が単語データです。
 
-Service Cloud Consultant の合格ラインは **78%** として設定しています。10問模試は整数換算のため8問以上、60問模試は47問以上で合格表示になります。10問模試の18分は、本番105分を問題数に比例換算した学習用の目安です。
+```js
+{
+  id,
+  jp,
+  en,
+  category,
+  summary,
+  examTip,
+  aliases
+}
+```
 
-
-## 選択肢別解説
-
-- 一問一答では回答後に、A/B/C/Dすべてについて「正解／不正解」と理由を表示します。
-- 10問・60問模試では、試験中は解説を表示せず、採点後の「問題別解説」で全選択肢を確認できます。
-- 元PDFに収録された正答・基本解説を学習データの基準としています。
-- 不正解選択肢の理由は、Salesforce機能の用途・制約を踏まえた学習用補足です。
-- 現行のSalesforce公式仕様と元PDFの記載に整合性の疑義がある問題は、サイト上で警告表示します。元PDFを無断で「正しいもの」に書き換えるのではなく、注意点を明示する方針です。
-
-### 精査時に参照した代表的なSalesforce公式仕様
-
-- Omni-Channel: ルーティングモデルは担当者の処理能力（capacity）を考慮できます。
-- Salesforce Connect: 外部オブジェクトはSalesforce外に保存されたデータを対応付けて参照できます。
-- Experience Cloud Sharing Sets: ユーザーのAccount/Contactとの関連に基づいてレコードアクセスを付与できます。
-- Salesforce Knowledge Data Categories: 標準では1グループ100カテゴリ、階層5レベル、1グループから1記事へ最大8カテゴリです。
-- Lightning Macros: 対象ページのアクションとLightningアプリのMacros utilityなどの前提条件があります。
+関連問題は `jp / en / aliases` を使って問題データから自動抽出します。
